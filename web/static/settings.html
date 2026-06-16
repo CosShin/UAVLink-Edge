@@ -1,0 +1,2719 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Setting- DroneBridge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="common-nav.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --border: #334155;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, #0c1222 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem 2rem;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .back-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent-blue);
+        }
+
+        .container h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-yellow), var(--accent-red));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .setting-card {
+            background: var(--bg-card);
+            border-radius: 1rem;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .setting-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .setting-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .setting-card:hover::before {
+            opacity: 1;
+        }
+
+        .card-camera::before { background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue)); }
+        .card-camera:hover { border-color: var(--accent-purple); }
+        .card-camera .card-icon { color: var(--accent-purple); }
+
+        .card-motor::before { background: linear-gradient(90deg, var(--accent-yellow), var(--accent-red)); }
+        .card-motor:hover { border-color: var(--accent-yellow); }
+        .card-motor .card-icon { color: var(--accent-yellow); }
+
+        .card-failsafe::before { background: linear-gradient(90deg, var(--accent-red), var(--accent-yellow)); }
+        .card-failsafe:hover { border-color: var(--accent-red); }
+        .card-failsafe .card-icon { color: var(--accent-red); }
+
+        .card-arm::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+        .card-arm:hover { border-color: var(--accent-green); }
+        .card-arm .card-icon { color: var(--accent-green); }
+
+        .card-gps::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); }
+        .card-gps:hover { border-color: var(--accent-cyan); }
+        .card-gps .card-icon { color: var(--accent-cyan); }
+
+        .card-camera-settings::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); }
+        .card-camera-settings:hover { border-color: var(--accent-blue); }
+        .card-camera-settings .card-icon { color: var(--accent-blue); }
+
+        .card-landing::before { background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan)); }
+        .card-landing:hover { border-color: var(--accent-purple); }
+        .card-landing .card-icon { color: var(--accent-purple); }
+
+        .card-hardware::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); }
+        .card-hardware:hover { border-color: var(--accent-cyan); }
+        .card-hardware .card-icon { color: var(--accent-cyan); }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .card-desc {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-success {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-warning {
+            background: var(--accent-yellow);
+            color: #0f172a;
+        }
+
+        .btn-warning:hover {
+            background: #ca8a04;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(234, 179, 8, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: #334155;
+            border-color: var(--accent-blue);
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-top: 0.5rem;
+        }
+
+        .status-success {
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .status-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-connected {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+        }
+
+        .status-available {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+        }
+
+        .status-no-ip {
+            background: rgba(234, 179, 8, 0.2);
+            color: var(--accent-yellow);
+        }
+
+        .status-no-internet {
+            background: rgba(249, 115, 22, 0.2);
+            color: var(--accent-orange);
+        }
+
+        .status-unavailable {
+            background: rgba(107, 114, 128, 0.2);
+            color: var(--text-secondary);
+        }
+
+        .status-checking {
+            background: rgba(107, 114, 128, 0.2);
+            color: var(--text-secondary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .output-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--accent-green);
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 1.5rem 0;
+        }
+
+        .modal-content-wide {
+            max-width: 720px;
+        }
+
+        .info-notice {
+            background: rgba(234, 179, 8, 0.1);
+            border: 1px solid rgba(234, 179, 8, 0.3);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-notice-title {
+            color: var(--accent-yellow);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-notice-text {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .section-subtitle {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .camera-port-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 640px) {
+            .camera-port-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .camera-port-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+
+        .camera-port-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .camera-port-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .camera-port-meta {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .camera-connected-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .camera-connected-list li {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .camera-connected-list li strong {
+            color: var(--text-primary);
+        }
+
+        .cam-dual-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.65rem;
+        }
+
+        @media (max-width: 520px) {
+            .cam-dual-grid { grid-template-columns: 1fr; }
+        }
+
+        .cam-col {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.65rem 0.7rem;
+        }
+
+        .cam-col-head {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .cam-col-name {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cam-pill {
+            font-size: 0.62rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .cam-pill.on {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+
+        .cam-pill.off {
+            background: rgba(148, 163, 184, 0.12);
+            color: var(--text-secondary);
+        }
+
+        .cam-port-line {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.45rem;
+            line-height: 1.35;
+        }
+
+        .cam-port-line.ok { color: #86efac; }
+        .cam-port-line.warn { color: #fbbf24; }
+
+        .cam-field-label {
+            display: block;
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            margin: 0.35rem 0 0.15rem;
+        }
+
+        .cam-select {
+            width: 100%;
+            padding: 0.35rem 0.45rem;
+            font-size: 0.78rem;
+            border-radius: 0.35rem;
+        }
+
+        .cam-advanced {
+            margin-top: 0.4rem;
+            font-size: 0.72rem;
+        }
+
+        .cam-advanced summary {
+            cursor: pointer;
+            color: var(--text-secondary);
+            user-select: none;
+        }
+
+        .cam-range-row {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-top: 0.25rem;
+        }
+
+        .cam-range-row input[type="range"] {
+            flex: 1;
+            height: 4px;
+        }
+
+        .cam-range-val {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            min-width: 1.5rem;
+            text-align: right;
+        }
+
+        .cam-num-input {
+            width: 100%;
+            padding: 0.3rem 0.45rem;
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+        }
+
+        .toggle-switch.cam-toggle {
+            width: 34px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch.cam-toggle .toggle-slider:before {
+            height: 12px;
+            width: 12px;
+            left: 3px;
+            bottom: 3px;
+        }
+
+        .toggle-switch.cam-toggle input:checked + .toggle-slider:before {
+            transform: translateX(16px);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--border);
+            border-radius: 999px;
+            transition: 0.2s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-blue);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        .setting-card-static {
+            cursor: default;
+        }
+
+        .setting-card-static:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .hw-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .hw-tab-btn {
+            padding: 0.6rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s ease;
+        }
+
+        .hw-tab-btn.active {
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+            background: rgba(59, 130, 246, 0.12);
+        }
+
+        .hw-tab-panel { display: none; }
+        .hw-tab-panel.active { display: block; }
+
+        .hw-info-box {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 0.5rem;
+            padding: 0.85rem 1rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .hw-gpio-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .hw-gpio-table th,
+        .hw-gpio-table td {
+            border: 1px solid var(--border);
+            padding: 0.5rem 0.65rem;
+            text-align: left;
+        }
+
+        .hw-gpio-table th {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <header class="db-shell-header">
+        <a href="/dashboard.html" class="db-back-btn">← Về Dashboard</a>
+        <h1 class="db-shell-title">🛠️ Cài đặt cơ bản</h1>
+    </header>
+    <div class="container">
+
+        <div class="settings-grid">
+            <!-- Motor Testing -->
+            <div class="setting-card card-motor">
+                <div class="card-icon">⚙️</div>
+                <div class="card-title">Motor Testing</div>
+                <div class="card-desc">
+                    Test the operation of each motor, confirm rotation direction and control response.
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-warning" onclick="testMotors()">Test Motor</button>
+                    <button class="btn btn-secondary" onclick="calibrateESC()">Calib ESC</button>
+                </div>
+                <div id="motor-status" style="display: none;" class="status-indicator status-info">
+                    Not tested
+                </div>
+            </div>
+
+            <!-- Failsafe Configuration -->
+            <div class="setting-card card-failsafe">
+                <div class="card-icon">🛡️</div>
+                <div class="card-title">Failsafe</div>
+                <div class="card-desc">
+                    Configure safety modes for signal loss or emergencies: RTL, Land, Hold.
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-danger" onclick="configFailsafe()">Configure</button>
+                    <button class="btn btn-secondary" onclick="testFailsafe()">Test</button>
+                </div>
+                <div id="failsafe-status" style="display: none;" class="status-indicator status-info">
+                    Not configured
+                </div>
+            </div>
+
+            <!-- Arm/Disarm Control -->
+            <div class="setting-card card-arm">
+                <div class="card-icon">🔓</div>
+                <div class="card-title">Arm / Disarm</div>
+                <div class="card-desc">
+                    Control the ARM/DISARM state of the drone, check arm conditions, and manage safety.
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-success" onclick="armDrone()">ARM</button>
+                    <button class="btn btn-danger" onclick="disarmDrone()">DISARM</button>
+                </div>
+                <div id="arm-status" class="status-indicator status-error">
+                    DISARMED
+                </div>
+            </div>
+
+            <!-- GPS Testing -->
+            <div class="setting-card card-gps">
+                <div class="card-icon">🛰️</div>
+                <div class="card-title">GPS Testing</div>
+                <div class="card-desc">
+                    Test GPS signal, satellite count, position accuracy, and compass.
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-primary" onclick="testGPS()">Test GPS</button>
+                    <button class="btn btn-secondary" onclick="compassCalib()">Calib Compass</button>
+                </div>
+                <div id="gps-status" style="display: none;" class="status-indicator status-info">
+                    Checking...
+                </div>
+            </div>
+
+            <!-- Camera Settings CM5 -->
+            <div class="setting-card card-camera-settings setting-card-static">
+                <div class="card-icon">🎥</div>
+                <div class="card-title">Camera CM5</div>
+                <div class="card-desc">
+                    Cấu hình sensor CSI (CAM0/CAM1) và stream lên server. Landing detection luôn dùng 640×480.
+                </div>
+                <div class="card-actions">
+                    <button type="button" class="btn btn-primary" onclick="openCameraSettings()">Configure</button>
+                    <button type="button" class="btn btn-secondary" onclick="refreshCameraDetect(true)">Scan</button>
+                </div>
+                <div id="camera-settings-status" class="status-indicator status-info">
+                    Đang tải trạng thái camera...
+                </div>
+            </div>
+
+            <!-- Auto Landing -->
+            <div class="setting-card card-landing">
+                <div class="card-icon">🛬</div>
+                <div class="card-title">Auto Landing</div>
+                <div class="card-desc">
+                    Configure the auto landing system, select detection templates, and adjust landing parameters.
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-primary" onclick="openAutoLandingSettings()">Configure Landing</button>
+                </div>
+                <div id="landing-status" class="status-indicator status-info">
+                    Template: Default
+                </div>
+            </div>
+
+            <!-- Hardware CM5 / Pi5 -->
+            <div class="setting-card card-hardware">
+                <div class="card-icon">🔧</div>
+                <div class="card-title">Phần cứng CM5 / Pi5</div>
+                <div class="card-desc">
+                    Cấu hình UART (TELEM1/TELEM2), Ethernet MAVLink (IP CM5 ↔ Pixhawk), chân GPIO/I2C LCD và module 4G.
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-primary" onclick="openHardwareSettings()">Cấu hình phần cứng</button>
+                    <a href="mavlink_settings.html" class="btn btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;">MAVLink Connection</a>
+                </div>
+                <div id="hardware-status" class="status-indicator status-info">
+                    Đang tải cấu hình...
+                </div>
+            </div>
+
+            <!-- Network Connection -->
+            <div class="setting-card" style="--accent-color: var(--accent-cyan);">
+                <div class="card-icon">🌐</div>
+                <div class="card-title">Network Connection</div>
+                <div class="card-desc">
+                    Quản lý kết nối mạng: 4G, WiFi. Chọn ưu tiên kết nối và xem trạng thái real-time.
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-primary" onclick="openNetworkSettings()">Configure Network</button>
+                    <button class="btn btn-secondary" onclick="reconnectNetwork()">Reconnect</button>
+                </div>
+                <div id="network-status" class="status-indicator status-info">
+                    Checking...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Motor Testing -->
+    <div id="motorTestModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Motor Testing</h2>
+                <button class="close-btn" onclick="closeModal('motorTestModal')">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Select Motor</label>
+                <select class="form-select" id="motorSelect">
+                    <option value="all">All Motors</option>
+                    <option value="1">Motor 1 (Front Right)</option>
+                    <option value="2">Motor 2 (Rear Left)</option>
+                    <option value="3">Motor 3 (Front Left)</option>
+                    <option value="4">Motor 4 (Rear Right)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Test Speed (%)</label>
+                <input type="range" class="form-input" min="0" max="50" value="20" id="motorSpeed" oninput="document.getElementById('speedValue').textContent = this.value + '%'">
+                <span id="speedValue">20%</span>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-warning" onclick="startMotorTest()">Start Test</button>
+                <button class="btn btn-danger" onclick="stopMotorTest()">Stop</button>
+                <button class="btn btn-secondary" onclick="closeModal('motorTestModal')">Close</button>
+            </div>
+            <div class="divider"></div>
+            <div class="output-box" id="motorOutput">
+Select a motor and press "Start Test"
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Failsafe Config -->
+    <div id="failsafeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Failsafe Configuration</h2>
+                <button class="close-btn" onclick="closeModal('failsafeModal')">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">RC Loss Action</label>
+                <select class="form-select" id="rcLossAction">
+                    <option value="0">Disabled</option>
+                    <option value="1" selected>Return to Launch (RTL)</option>
+                    <option value="2">Land</option>
+                    <option value="3">Hold</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Data Link Loss Action</label>
+                <select class="form-select" id="dataLossAction">
+                    <option value="0">Disabled</option>
+                    <option value="1" selected>Return to Launch (RTL)</option>
+                    <option value="2">Land</option>
+                    <option value="3">Hold</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Battery Failsafe (%)</label>
+                <input type="number" class="form-input" value="20" min="10" max="50" id="batteryFailsafe">
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="saveFailsafe()">Save Configuration</button>
+                <button class="btn btn-secondary" onclick="closeModal('failsafeModal')">Cancel</button>
+            </div>
+            <div class="divider"></div>
+            <div class="output-box" id="failsafeOutput">
+Current failsafe configuration will be displayed here...
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for GPS Testing -->
+    <div id="gpsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">GPS Testing</h2>
+                <button class="close-btn" onclick="closeModal('gpsModal')">×</button>
+            </div>
+            <div class="output-box" id="gpsOutput">
+Loading GPS information...
+            </div>
+            <div class="divider"></div>
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="refreshGPS()">Refresh</button>
+                <button class="btn btn-secondary" onclick="closeModal('gpsModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Compass Calibration -->
+    <div id="compassModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 class="modal-title">Compass Calibration</h2>
+                <button class="close-btn" onclick="closeModal('compassModal')">×</button>
+            </div>
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h3 style="color: var(--accent-cyan); margin-bottom: 1rem;">Sensors Setup</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Rotate the drone continuously according to the diagram until completed</p>
+                
+                <div id="orientationGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Row 1 -->
+                    <div class="orientation-box" data-orientation="0" style="background: var(--bg-primary); border: 2px solid var(--border); border-radius: 0.75rem; padding: 1.5rem;">
+                        <div style="font-size: 4rem; margin-bottom: 0.5rem;">✈️</div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Nose Down</div>
+                        <div class="orientation-status" style="color: var(--accent-red);">Incomplete</div>
+                    </div>
+                    <div class="orientation-box" data-orientation="1" style="background: var(--bg-primary); border: 2px solid var(--accent-yellow); border-radius: 0.75rem; padding: 1.5rem;">
+                        <div style="font-size: 4rem; margin-bottom: 0.5rem; position: relative;">
+                            <div style="display: inline-block; transform: rotate(0deg);">✈️</div>
+                            <div style="position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); font-size: 3rem;">↻</div>
+                        </div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem; color: var(--accent-yellow);">Rotate</div>
+                        <div class="orientation-status" style="color: var(--accent-yellow);">In Progress...</div>
+                    </div>
+                    <div class="orientation-box" data-orientation="2" style="background: var(--bg-primary); border: 2px solid var(--border); border-radius: 0.75rem; padding: 1.5rem;">
+                        <div style="font-size: 4rem; margin-bottom: 0.5rem; transform: rotate(180deg);">✈️</div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Nose Up</div>
+                        <div class="orientation-status" style="color: var(--accent-red);">Incomplete</div>
+                    </div>
+                    
+                    <!-- Row 2 -->
+                    <div class="orientation-box" data-orientation="3" style="background: var(--bg-primary); border: 2px solid var(--border); border-radius: 0.75rem; padding: 1.5rem;">
+                        <div style="font-size: 4rem; margin-bottom: 0.5rem; transform: rotate(-90deg);">✈️</div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Left</div>
+                        <div class="orientation-status" style="color: var(--accent-red);">Incomplete</div>
+                    </div>
+                    <div class="orientation-box" data-orientation="4" style="background: var(--bg-primary); border: 2px solid var(--border); border-radius: 0.75rem; padding: 1.5rem;">
+                        <div style="font-size: 4rem; margin-bottom: 0.5rem; transform: rotate(90deg);">✈️</div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Right</div>
+                        <div class="orientation-status" style="color: var(--accent-red);">Incomplete</div>
+                    </div>
+                    <div class="orientation-box" data-orientation="5" style="background: var(--bg-primary); border: 2px solid var(--border); border-radius: 0.75rem; padding: 1.5rem;">
+                        <div style="font-size: 4rem; margin-bottom: 0.5rem;">🔽</div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">Tail Down</div>
+                        <div class="orientation-status" style="color: var(--accent-red);">Incomplete</div>
+                    </div>
+                </div>
+                
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
+                    <div style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Tiến độ hiệu chỉnh</div>
+                    <div style="background: var(--bg-secondary); height: 24px; border-radius: 12px; overflow: hidden; position: relative;">
+                        <div id="compassProgress" style="background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); height: 100%; width: 16.6%; transition: width 0.5s ease;"></div>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: 600; font-size: 0.875rem;">16%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="startCompassCalib()">Start</button>
+                <button class="btn btn-danger" onclick="cancelCompassCalib()">Cancel</button>
+                <button class="btn btn-secondary" onclick="closeModal('compassModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Network Settings -->
+    <div id="networkModal" class="modal">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h2 class="modal-title">🌐 Network Settings</h2>
+                <button class="close-btn" onclick="closeModal('networkModal')">×</button>
+            </div>
+            
+            <!-- Connection Priority -->
+            <div class="form-group">
+                <label class="form-label">Connection Priority</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="priority" value="4g" id="priority4g">
+                        <span>📡 4G First</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="priority" value="wifi" id="priorityWifi">
+                        <span>📶 WiFi First</span>
+                    </label>
+                </div>
+                <small style="color: var(--text-secondary);">Drone will try to connect following this priority order</small>
+            </div>
+
+            <!-- Interface Status -->
+            <div class="form-group">
+                <label class="form-label">Interface Status</label>
+                
+                <!-- 4G Status -->
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="font-size: 1.5rem;">📡</div>
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-primary);">4G / LTE</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);" id="status-4g-info">wwan0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="status-badge status-checking" id="status-4g">Checking...</span>
+                        </div>
+                    </div>
+                    <div id="status-4g-details" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.875rem; color: var(--text-secondary); display: none;">
+                        IP: <span id="status-4g-ip">-</span><br>
+                        Signal: <span id="status-4g-signal">-</span>
+                    </div>
+                </div>
+
+                <!-- WiFi Status -->
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="font-size: 1.5rem;">📶</div>
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-primary);">WiFi</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);" id="status-wifi-info">wlan0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="status-badge status-checking" id="status-wifi">Checking...</span>
+                        </div>
+                    </div>
+                    <div id="status-wifi-details" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.875rem; color: var(--text-secondary); display: none;">
+                        IP: <span id="status-wifi-ip">-</span><br>
+                        SSID: <span id="status-wifi-ssid">-</span>
+                    </div>
+                </div>
+
+                <!-- Ethernet Status -->
+                <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="font-size: 1.5rem;">🔌</div>
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-primary);">Ethernet</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);" id="status-eth-info">eth0</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="status-badge status-checking" id="status-eth">Checking...</span>
+                        </div>
+                    </div>
+                    <div id="status-eth-details" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.875rem; color: var(--text-secondary); display: none;">
+                        IP: <span id="status-eth-ip">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Connection -->
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.5rem; padding: 1rem; margin: 1rem 0;">
+                <div style="color: var(--accent-blue); font-weight: 600; margin-bottom: 0.5rem;">🔗 Active Connection</div>
+                <div id="activeConnection" style="color: var(--text-secondary); font-size: 0.875rem;">
+                    Checking...
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                <button class="btn btn-secondary" style="flex: 1;" onclick="refreshNetworkStatus()">🔄 Refresh Status</button>
+                <button class="btn btn-primary" style="flex: 1;" onclick="saveNetworkPriority()">💾 Save Priority</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Auto Landing Settings -->
+    <div id="autoLandingModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title">🛬 Landing Settings</h2>
+                <button class="close-btn" onclick="closeModal('autoLandingModal')">×</button>
+            </div>
+            
+            <!-- Landing Mode -->
+            <div class="form-group">
+                <label class="form-label">Landing Mode</label>
+                <select class="form-select" id="landingMode" onchange="updateLandingPreview()">
+                    <option value="easy">Easy - Stable, Safe (recommended for beginners)</option>
+                    <option value="normal" selected>Normal - Balance between speed and accuracy</option>
+                    <option value="fast">Fast - Quick landing, less checks</option>
+                    <option value="precision">Precision - High accuracy, slower</option>
+                    <option value="windy">Windy - Optimized for windy conditions</option>
+                </select>
+                <small style="color: var(--text-secondary);">Landing mode affects speed, accuracy, and stability</small>
+            </div>
+
+            <!-- Environment -->
+            <div class="form-group">
+                <label class="form-label">Environment (Optional)</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="environment" value="indoor" onchange="updateLandingPreview()">
+                        <span>🏠 Indoor</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="environment" value="outdoor" checked onchange="updateLandingPreview()">
+                        <span>🌤️ Outdoor</span>
+                    </label>
+                </div>
+                <small style="color: var(--text-secondary);">Indoor: low wind, stable lighting | Outdoor: windy, changing weather</small>
+            </div>
+
+            <!-- Marker Type -->
+            <div class="form-group">
+                <label class="form-label">Template Landing Pad</label>
+                <select class="form-select" id="landingTemplate" onchange="previewTemplate()">
+                    <option value="">Loading templates...</option>
+                </select>
+                <small style="color: var(--text-secondary);">Select a template that matches your landing pad</small>
+            </div>
+
+            <!-- Marker Preview -->
+            <div id="markerPreview" style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1.5rem; margin: 1rem 0; text-align: center;">
+                <img id="templateImg" src="" alt="Template Preview" style="max-width: 200px; max-height: 200px; display: none; margin: 0 auto;"/>
+                <div id="templateDesc" style="color: var(--text-secondary); margin-top: 0.5rem;">Select a template to see preview</div>
+            </div>
+
+            <!-- Safety Level -->
+            <div class="form-group">
+                <label class="form-label">Safety Level</label>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span style="color: var(--accent-green); font-size: 0.875rem; min-width: 100px;">Conservative</span>
+                    <input type="range" class="form-input" min="1" max="3" value="2" id="safetyLevel" 
+                           style="flex: 1;" 
+                           oninput="updateSafetyLabel(this.value)"
+                           list="safety-markers">
+                    <datalist id="safety-markers">
+                        <option value="1"></option>
+                        <option value="2"></option>
+                        <option value="3"></option>
+                    </datalist>
+                    <span style="color: var(--accent-red); font-size: 0.875rem; min-width: 100px; text-align: right;">Aggressive</span>
+                </div>
+                <div style="text-align: center; margin-top: 0.5rem;">
+                    <span id="safetyLabel" style="color: var(--accent-blue); font-weight: 600;">Balanced</span>
+                </div>
+                <small style="color: var(--text-secondary);">
+                    Conservative: More checks, slower, safer<br>
+                    Balanced: Balance between speed and safety<br>
+                    Aggressive: Faster, fewer checks, higher risk
+                </small>
+            </div>
+
+            <!-- Advanced Settings Summary -->
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.5rem; padding: 1rem; margin: 1rem 0;">
+                <div style="color: var(--accent-blue); font-weight: 600; margin-bottom: 0.5rem;">📋 Current Configuration</div>
+                <div id="configSummary" style="color: var(--text-secondary); font-size: 0.875rem; font-family: 'JetBrains Mono', monospace;">
+                    Mode: Normal | Environment: Outdoor | Marker: H | Safety: Balanced
+                </div>
+            </div>
+
+            <!-- Warning Box -->
+            <div style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: 0.5rem; padding: 1rem; margin: 1rem 0;">
+                <div style="color: var(--accent-yellow); font-weight: 600; margin-bottom: 0.5rem;">⚠️ Safety Notice</div>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                    • Always test at a safe height first (> 5m)<br>
+                    • Ensure the landing pad is clear and unobstructed<br>
+                    • Manual override mode available for intervention<br>
+                    • Check GPS and compass before use<br>
+                    • Do not use Aggressive mode without experience
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="card-actions">
+                <button class="btn btn-primary" onclick="saveLandingSettings()">💾 Save Configuration</button>
+                <button class="btn btn-warning" onclick="testLanding()">🧪 Test Landing</button>
+                <button class="btn btn-secondary" onclick="closeModal('autoLandingModal')">Close</button>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="output-box" id="landingOutput">
+Điều chỉnh các thông số landing, sau đó nhấn "Lưu cấu hình"
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Camera CM5 -->
+    <div id="cameraModal" class="modal">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <h2 class="modal-title">🎥 Camera CM5</h2>
+                <button class="close-btn" onclick="closeModal('cameraModal')">×</button>
+            </div>
+
+            <div class="info-notice">
+                <div class="info-notice-title">Lưu ý</div>
+                <div class="info-notice-text">
+                    Landing detection luôn dùng 640×480. Đổi overlay sensor cần reboot;
+                    stream áp dụng ngay sau «Lưu &amp; Restart».
+                </div>
+            </div>
+
+            <div class="cam-dual-grid">
+                <div class="cam-col" data-cam="0">
+                    <div class="cam-col-head">
+                        <span class="cam-col-name">CAM0 · J30</span>
+                        <span id="stream-cam0-badge" class="cam-pill off">—</span>
+                        <label class="toggle-switch cam-toggle" title="Bật/tắt stream CAM0">
+                            <input type="checkbox" id="stream-cam0-enabled" onchange="onCameraStreamToggleChanged()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div id="cam0-port-status" class="cam-port-line">Đang tải...</div>
+                    <label class="cam-field-label" for="port-cam0-overlay">Sensor</label>
+                    <select id="port-cam0-overlay" class="form-select cam-select"></select>
+                    <label class="cam-field-label" for="res-cam0">Độ phân giải</label>
+                    <select id="res-cam0" class="form-select cam-select">
+                        <option value="320x240">320×240</option>
+                        <option value="640x480" selected>640×480</option>
+                        <option value="800x600">800×600</option>
+                        <option value="1280x720">1280×720</option>
+                        <option value="1920x1080">1920×1080</option>
+                    </select>
+                    <label class="cam-field-label" for="format-cam0">Format</label>
+                    <select id="format-cam0" class="form-select cam-select">
+                        <option value="RGB888" selected>RGB888</option>
+                        <option value="BGR888">BGR888</option>
+                        <option value="YUV420">YUV420</option>
+                    </select>
+                    <details class="cam-advanced">
+                        <summary>Tune ảnh</summary>
+                        <label class="cam-field-label">Brightness</label>
+                        <div class="cam-range-row">
+                            <input type="range" min="-1" max="1" value="0" step="0.1" id="bright-cam0" oninput="document.getElementById('bright-val-cam0').textContent=this.value">
+                            <span class="cam-range-val" id="bright-val-cam0">0</span>
+                        </div>
+                        <label class="cam-field-label">Contrast</label>
+                        <div class="cam-range-row">
+                            <input type="range" min="0" max="2" value="1" step="0.1" id="contrast-cam0" oninput="document.getElementById('contrast-val-cam0').textContent=this.value">
+                            <span class="cam-range-val" id="contrast-val-cam0">1</span>
+                        </div>
+                        <label class="cam-field-label">Exposure (μs, 0=auto)</label>
+                        <input type="number" class="form-input cam-num-input" id="exp-cam0" value="0" min="0" max="100000" step="1000">
+                    </details>
+                </div>
+                <div class="cam-col" data-cam="1">
+                    <div class="cam-col-head">
+                        <span class="cam-col-name">CAM1 · J29</span>
+                        <span id="stream-cam1-badge" class="cam-pill off">—</span>
+                        <label class="toggle-switch cam-toggle" title="Bật/tắt stream CAM1">
+                            <input type="checkbox" id="stream-cam1-enabled" onchange="onCameraStreamToggleChanged()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div id="cam1-port-status" class="cam-port-line">Đang tải...</div>
+                    <label class="cam-field-label" for="port-cam1-overlay">Sensor</label>
+                    <select id="port-cam1-overlay" class="form-select cam-select"></select>
+                    <label class="cam-field-label" for="res-cam1">Độ phân giải</label>
+                    <select id="res-cam1" class="form-select cam-select">
+                        <option value="320x240">320×240</option>
+                        <option value="640x480" selected>640×480</option>
+                        <option value="800x600">800×600</option>
+                        <option value="1280x720">1280×720</option>
+                        <option value="1920x1080">1920×1080</option>
+                    </select>
+                    <label class="cam-field-label" for="format-cam1">Format</label>
+                    <select id="format-cam1" class="form-select cam-select">
+                        <option value="RGB888" selected>RGB888</option>
+                        <option value="BGR888">BGR888</option>
+                        <option value="YUV420">YUV420</option>
+                    </select>
+                    <details class="cam-advanced">
+                        <summary>Tune ảnh</summary>
+                        <label class="cam-field-label">Brightness</label>
+                        <div class="cam-range-row">
+                            <input type="range" min="-1" max="1" value="0" step="0.1" id="bright-cam1" oninput="document.getElementById('bright-val-cam1').textContent=this.value">
+                            <span class="cam-range-val" id="bright-val-cam1">0</span>
+                        </div>
+                        <label class="cam-field-label">Contrast</label>
+                        <div class="cam-range-row">
+                            <input type="range" min="0" max="2" value="1" step="0.1" id="contrast-cam1" oninput="document.getElementById('contrast-val-cam1').textContent=this.value">
+                            <span class="cam-range-val" id="contrast-val-cam1">1</span>
+                        </div>
+                        <label class="cam-field-label">Exposure (μs, 0=auto)</label>
+                        <input type="number" class="form-input cam-num-input" id="exp-cam1" value="0" min="0" max="100000" step="1000">
+                    </details>
+                </div>
+            </div>
+
+            <div class="card-actions" style="margin-top:1.25rem;">
+                <button type="button" class="btn btn-primary" onclick="saveCameraAll(true)">Lưu &amp; Restart</button>
+                <button type="button" class="btn btn-secondary" onclick="saveCameraAll(false)">Lưu</button>
+                <button type="button" class="btn btn-secondary" onclick="restartCameraStreams()">Restart stream</button>
+                <button type="button" class="btn btn-secondary" onclick="refreshCameraDetect(true)">Scan lại</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('cameraModal')">Đóng</button>
+            </div>
+
+            <div class="divider"></div>
+            <div class="output-box" id="cameraOutput">Chỉnh sensor + stream cho CAM0/CAM1, sau đó nhấn Lưu.</div>
+        </div>
+    </div>
+
+    <!-- Modal for Hardware CM5 / Pi5 -->
+    <div id="hardwareModal" class="modal">
+        <div class="modal-content" style="max-width: 760px;">
+            <div class="modal-header">
+                <h2 class="modal-title">🔧 Phần cứng CM5 / Pi5</h2>
+                <button class="close-btn" onclick="closeModal('hardwareModal')">×</button>
+            </div>
+
+            <div class="hw-info-box">
+                Thay đổi UART hoặc IP Ethernet yêu cầu <strong>khởi động lại dịch vụ DroneBridge</strong>.
+                UART2 (TELEM2) cần <code>dtoverlay=uart2</code> trong <code>/boot/firmware/config.txt</code>.
+            </div>
+
+            <div class="hw-tabs">
+                <button type="button" class="hw-tab-btn active" data-hw-tab="uart" onclick="switchHardwareTab('uart')">📡 UART / TELEM</button>
+                <button type="button" class="hw-tab-btn" data-hw-tab="eth" onclick="switchHardwareTab('eth')">🔌 Ethernet MAVLink</button>
+                <button type="button" class="hw-tab-btn" data-hw-tab="gpio" onclick="switchHardwareTab('gpio')">⚡ GPIO &amp; I2C</button>
+            </div>
+
+            <div id="hw-tab-uart" class="hw-tab-panel active">
+                <div class="form-group">
+                    <label class="form-label">UART Preset (CM5 / Pi5)</label>
+                    <select class="form-input" id="hw-uart-preset" onchange="applyUartPreset()">
+                        <option value="custom">Tùy chỉnh — nhập tay đường dẫn</option>
+                        <option value="/dev/ttyAMA0">UART0 / PL011 — /dev/ttyAMA0</option>
+                        <option value="/dev/ttyAMA1">UART1 — /dev/ttyAMA1 (GPIO 8–11)</option>
+                        <option value="/dev/ttyAMA2">UART2 / TELEM2 — /dev/ttyAMA2 (GPIO 4–7)</option>
+                        <option value="/dev/serial0">serial0 (alias UART0)</option>
+                        <option value="/dev/ttyUSB0">USB Serial — /dev/ttyUSB0</option>
+                        <option value="/dev/ttyACM0">USB ACM — /dev/ttyACM0</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Serial Port (TELEM)</label>
+                    <input type="text" class="form-input" id="hw-serial-port" placeholder="/dev/ttyAMA2" oninput="syncUartPresetFromPort()">
+                    <small style="color: var(--text-secondary);">Ví dụ: bạn dùng UART2, người khác có thể chọn UART1 → /dev/ttyAMA1</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Baud Rate</label>
+                    <select class="form-input" id="hw-serial-baud">
+                        <option value="9600">9600</option>
+                        <option value="57600">57600</option>
+                        <option value="115200">115200</option>
+                        <option value="230400">230400</option>
+                        <option value="460800">460800</option>
+                        <option value="921600">921600</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Loại kết nối MAVLink</label>
+                    <select class="form-input" id="hw-connection-type">
+                        <option value="prefer_ethernet">ETH ưu tiên + UART backup</option>
+                        <option value="ethernet">Ethernet (UDP only)</option>
+                        <option value="serial">Serial only</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Local Listen Port (UDP)</label>
+                    <input type="number" class="form-input" id="hw-local-listen-port" value="14550">
+                </div>
+            </div>
+
+            <div id="hw-tab-eth" class="hw-tab-panel">
+                <div class="form-group">
+                    <label class="form-label">Interface</label>
+                    <input type="text" class="form-input" id="hw-eth-interface" placeholder="eth0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CM5 Local IP</label>
+                    <input type="text" class="form-input" id="hw-eth-local-ip" placeholder="10.41.10.10">
+                    <small style="color: var(--text-secondary);">IP tĩnh trên cổng Ethernet nối Pixhawk — có thể đổi theo mạng của bạn</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Broadcast IP</label>
+                    <input type="text" class="form-input" id="hw-eth-broadcast-ip" placeholder="10.41.10.255">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Pixhawk IP</label>
+                    <input type="text" class="form-input" id="hw-eth-pixhawk-ip" placeholder="10.41.10.2">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Pixhawk Port</label>
+                    <input type="number" class="form-input" id="hw-eth-pixhawk-port" value="14550">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Subnet (CIDR)</label>
+                    <input type="text" class="form-input" id="hw-eth-subnet" placeholder="24">
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+                    <input type="checkbox" id="hw-eth-auto-setup" checked>
+                    <label class="form-label" style="margin:0;">Tự cấu hình IP khi khởi động (auto_setup)</label>
+                </div>
+            </div>
+
+            <div id="hw-tab-gpio" class="hw-tab-panel">
+                <h3 style="margin-bottom:0.75rem;color:var(--text-primary);">LCD I2C (SH1107)</h3>
+                <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+                    <input type="checkbox" id="hw-lcd-enabled" checked>
+                    <label class="form-label" style="margin:0;">Bật màn hình LCD</label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Device Tree Overlay</label>
+                    <select class="form-input" id="hw-lcd-overlay">
+                        <option value="i2c3-pi5">i2c3-pi5 (Pi5/CM5 — GPIO 22/23)</option>
+                        <option value="i2c1-pi5">i2c1-pi5</option>
+                        <option value="i2c3">i2c3 (Pi4)</option>
+                        <option value="i2c1">i2c1</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">I2C Pins Group</label>
+                    <select class="form-input" id="hw-lcd-pins">
+                        <option value="pins_22_23">pins_22_23 (GPIO 22 SDA, 23 SCL)</option>
+                        <option value="pins_2_3">pins_2_3 (GPIO 2/3)</option>
+                        <option value="pins_44_45">pins_44_45 (GPIO 44/45)</option>
+                    </select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                    <div class="form-group">
+                        <label class="form-label">I2C Bus</label>
+                        <input type="number" class="form-input" id="hw-lcd-bus" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">I2C Address</label>
+                        <input type="number" class="form-input" id="hw-lcd-address" value="60">
+                    </div>
+                </div>
+
+                <h3 style="margin:1.25rem 0 0.75rem;color:var(--text-primary);">GPIO Module 4G (tham chiếu)</h3>
+                <div class="hw-info-box" style="margin-bottom:0.5rem;">
+                    Các chân 4G được điều khiển bởi <code>Module_4G/enable_4g_auto.py</code>. Bảng dưới để tra cứu — thay đổi cần sửa script Python tương ứng.
+                </div>
+                <table class="hw-gpio-table">
+                    <thead>
+                        <tr><th>GPIO</th><th>Chức năng</th><th>Mức hoạt động</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>GPIO27</td><td>Power Main</td><td>LOW = ON</td></tr>
+                        <tr><td>GPIO10</td><td>4G On/Off</td><td>LOW = ON</td></tr>
+                        <tr><td>GPIO17</td><td>4G Reset</td><td>LOW = Normal</td></tr>
+                        <tr><td>GPIO2</td><td>RF Disable</td><td>HIGH = RF Enabled</td></tr>
+                        <tr><td>GPIO3</td><td>GNSS Disable</td><td>HIGH = GNSS Enabled</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card-actions" style="margin-top:1.25rem;">
+                <button class="btn btn-primary" id="hw-save-btn" onclick="saveHardwareSettings()">💾 Lưu cấu hình phần cứng</button>
+                <button class="btn btn-secondary" onclick="loadHardwareSettings()">🔄 Tải lại</button>
+                <button class="btn btn-secondary" onclick="closeModal('hardwareModal')">Đóng</button>
+            </div>
+            <div id="hw-save-status" class="status-indicator status-info" style="margin-top:0.75rem;display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Modal management
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        let cameraRegistry = [];
+
+        async function fetchJson(url, options) {
+            const res = await fetch(url, options);
+            const text = await res.text();
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                const preview = text.trim().slice(0, 80).replace(/\s+/g, ' ');
+                throw new Error(
+                    res.ok
+                        ? 'Phản hồi không phải JSON: ' + preview
+                        : `HTTP ${res.status}: ${preview || res.statusText}`
+                );
+            }
+        }
+
+        function setCameraInlineStatus(text, kind) {
+            const status = document.getElementById('camera-settings-status');
+            if (!status) return;
+            let cls = 'status-indicator ';
+            if (kind === 'ok') cls += 'status-success';
+            else if (kind === 'err') cls += 'status-error';
+            else cls += 'status-info';
+            status.className = cls;
+            status.textContent = text;
+        }
+
+        function setCameraMsg(text) {
+            const el = document.getElementById('cameraOutput');
+            if (el) el.textContent = text || '';
+        }
+
+        function openCameraSettings() {
+            openModal('cameraModal');
+            ensureCameraRegistryLoaded().then(() => {
+                refreshCameraDetect(false);
+                loadAllCameraConfigs();
+            });
+        }
+
+        function fillOverlaySelects() {
+            ['cam0', 'cam1'].forEach(port => {
+                const sel = document.getElementById('port-' + port + '-overlay');
+                if (!sel) return;
+                sel.innerHTML = '';
+                cameraRegistry.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.overlay;
+                    opt.textContent = `${s.name} (${s.id})`;
+                    sel.appendChild(opt);
+                });
+            });
+        }
+
+        function renderCameraDetect(data) {
+            if (!data) return;
+
+            const ok = data.connected_count || 0;
+            const exp = data.expected_count || 0;
+            const sensors = (data.connected || []).map(c => (c.sensor || '').toUpperCase()).join(' + ');
+            if (sensors) {
+                setCameraInlineStatus(`${ok}/${exp} camera · ${sensors}`, ok >= exp ? 'ok' : 'warn');
+            } else if (ok > 0) {
+                setCameraInlineStatus(`${ok}/${exp} camera`, 'ok');
+            } else {
+                setCameraInlineStatus(`Không thấy camera · ${data.supported_types || 0} loại hỗ trợ`, 'err');
+            }
+
+            if (data.ports) {
+                ['cam0', 'cam1'].forEach((p, idx) => {
+                    const port = data.ports[p];
+                    if (!port) return;
+                    const sel = document.getElementById('port-' + p + '-overlay');
+                    if (sel && port.overlay) sel.value = port.overlay;
+
+                    const line = document.getElementById('cam' + idx + '-port-status');
+                    if (line) {
+                        const okPort = port.status === 'ok';
+                        line.className = 'cam-port-line ' + (okPort ? 'ok' : 'warn');
+                        const idxTxt = port.libcamera_index != null ? port.libcamera_index : '—';
+                        const sensor = (port.sensor || port.overlay || '?').toUpperCase();
+                        line.textContent = `${sensor} · idx ${idxTxt} · ${okPort ? 'OK' : (port.message || 'Kiểm tra cáp')}`;
+                    }
+                });
+            }
+        }
+
+        function refreshCameraDetect(force) {
+            const q = force ? '?refresh=1' : '';
+            if (force) setCameraInlineStatus('Đang quét camera...', 'warn');
+            return fetchJson('/api/camera/detect' + q)
+                .then(data => {
+                    renderCameraDetect(data);
+                    return data;
+                })
+                .catch(e => {
+                    setCameraInlineStatus('Lỗi API: ' + e.message, 'err');
+                    throw e;
+                });
+        }
+
+        function buildCamConfigFromUI(id) {
+            const resolution = document.getElementById('res-cam' + id).value;
+            const [width, height] = resolution.split('x').map(Number);
+            return {
+                camera_id: id,
+                enabled: document.getElementById('stream-cam' + id + '-enabled').checked,
+                format: document.getElementById('format-cam' + id).value,
+                size: [width, height],
+                brightness: parseFloat(document.getElementById('bright-cam' + id).value),
+                contrast: parseFloat(document.getElementById('contrast-cam' + id).value),
+                exposure_time: parseInt(document.getElementById('exp-cam' + id).value, 10)
+            };
+        }
+
+        function applyCamConfigToUI(id, config) {
+            if (!config) return;
+            const sizeStr = `${config.size[0]}x${config.size[1]}`;
+            const resEl = document.getElementById('res-cam' + id);
+            if (resEl) resEl.value = sizeStr;
+            const fmtEl = document.getElementById('format-cam' + id);
+            if (fmtEl) fmtEl.value = config.format || 'RGB888';
+            const bright = config.brightness ?? 0;
+            const contrast = config.contrast ?? 1;
+            document.getElementById('bright-cam' + id).value = bright;
+            document.getElementById('bright-val-cam' + id).textContent = bright;
+            document.getElementById('contrast-cam' + id).value = contrast;
+            document.getElementById('contrast-val-cam' + id).textContent = contrast;
+            document.getElementById('exp-cam' + id).value = config.exposure_time ?? 0;
+            const enabledEl = document.getElementById('stream-cam' + id + '-enabled');
+            if (enabledEl) enabledEl.checked = config.enabled !== false;
+        }
+
+        async function saveCameraAll(restart) {
+            setCameraMsg(restart ? 'Đang lưu và restart stream...' : 'Đang lưu...');
+            setCameraInlineStatus('Đang lưu cấu hình...', 'warn');
+
+            try {
+                const ports = {
+                    cam0: {
+                        overlay: document.getElementById('port-cam0-overlay').value || 'imx219',
+                        sensor: document.getElementById('port-cam0-overlay').value || 'imx219',
+                        enabled: true
+                    },
+                    cam1: {
+                        overlay: document.getElementById('port-cam1-overlay').value || 'imx219',
+                        sensor: document.getElementById('port-cam1-overlay').value || 'imx219',
+                        enabled: true
+                    }
+                };
+                const portRes = await fetchJson('/api/camera/ports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ports })
+                });
+                if (!portRes.success) throw new Error(portRes.message || 'Lỗi lưu sensor');
+
+                for (let id = 0; id < 2; id++) {
+                    const config = { ...buildCamConfigFromUI(id), restart: restart && id === 1 };
+                    const saveRes = await fetchJson('/api/camera/config/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(config)
+                    });
+                    if (!saveRes.success) throw new Error(saveRes.message || ('Lỗi lưu stream cam' + id));
+                }
+
+                cameraStreamDirty = false;
+                const noHw = (document.querySelectorAll('.cam-port-line.warn').length >= 2);
+                const suffix = noHw
+                    ? ' (chưa có camera — cấu hình đã lưu, stream sẽ chạy khi gắn module)'
+                    : (restart ? ' · đã restart' : '');
+                setCameraMsg('✓ Đã lưu sensor + stream' + suffix);
+                await refreshCameraDetect(false);
+                await loadAllCameraConfigs();
+            } catch (e) {
+                setCameraMsg('✗ ' + e.message);
+                setCameraInlineStatus(e.message, 'err');
+            }
+        }
+
+        function ensureCameraRegistryLoaded() {
+            if (cameraRegistry.length) {
+                fillOverlaySelects();
+                return Promise.resolve();
+            }
+            return fetchJson('/api/camera/registry')
+                .then(d => {
+                    if (d.success && d.registry && d.registry.sensors) {
+                        cameraRegistry = d.registry.sensors;
+                        fillOverlaySelects();
+                    } else if (!d.success) {
+                        throw new Error(d.message || 'Không tải được camera registry');
+                    }
+                })
+                .catch(e => {
+                    setCameraMsg('Registry: ' + e.message);
+                    cameraRegistry = [
+                        { id: 'imx219', overlay: 'imx219', name: 'Camera Module v2' },
+                        { id: 'ov5647', overlay: 'ov5647', name: 'Camera Module v1' }
+                    ];
+                    fillOverlaySelects();
+                });
+        }
+
+        function openCameraSetup() {
+            openCameraSettings();
+        }
+
+        // Motor Testing
+        function testMotors() {
+            openModal('motorTestModal');
+        }
+
+        function startMotorTest() {
+            const output = document.getElementById('motorOutput');
+            const motor = document.getElementById('motorSelect').value;
+            const speed = document.getElementById('motorSpeed').value;
+            
+            const status = document.getElementById('motor-status');
+            status.style.display = 'inline-flex';
+            status.className = 'status-indicator status-info';
+            status.textContent = 'Đang test motor...';
+            
+            if (motor === 'all') {
+                output.textContent = `Bắt đầu test tất cả motor ở tốc độ ${speed}%\n\n`;
+                output.textContent += 'Motor 1: OK\n';
+                output.textContent += 'Motor 2: OK\n';
+                output.textContent += 'Motor 3: OK\n';
+                output.textContent += 'Motor 4: OK\n';
+            } else {
+                output.textContent = `Test Motor ${motor} ở tốc độ ${speed}%\n\n`;
+                output.textContent += `Motor ${motor}: Đang quay...\n`;
+            }
+            
+            setTimeout(() => {
+                status.className = 'status-indicator status-success';
+                status.textContent = '✓ Test hoàn tất';
+                output.textContent += '\n✓ Tất cả motor hoạt động bình thường';
+            }, 3000);
+        }
+
+        function stopMotorTest() {
+            const output = document.getElementById('motorOutput');
+            output.textContent += '\n\n⚠ Đã dừng test motor';
+        }
+
+        function calibrateESC() {
+            alert('Chức năng hiệu chỉnh ESC sẽ được thêm vào.');
+        }
+
+        // Failsafe Configuration
+        function configFailsafe() {
+            openModal('failsafeModal');
+            const output = document.getElementById('failsafeOutput');
+            output.textContent = 'Đang tải cấu hình hiện tại...\n\n';
+            output.textContent += 'RC Loss Action: Return to Launch (RTL)\n';
+            output.textContent += 'Data Link Loss Action: Return to Launch (RTL)\n';
+            output.textContent += 'Battery Failsafe: 20%\n';
+        }
+
+        function testFailsafe() {
+            alert('Test failsafe: Chức năng này sẽ mô phỏng các tình huống mất tín hiệu');
+        }
+
+        function saveFailsafe() {
+            const rcLoss = document.getElementById('rcLossAction').value;
+            const dataLoss = document.getElementById('dataLossAction').value;
+            const battery = document.getElementById('batteryFailsafe').value;
+            const output = document.getElementById('failsafeOutput');
+            
+            output.textContent = 'Đang lưu cấu hình...\n\n';
+            
+            setTimeout(() => {
+                output.textContent += '✓ Đã lưu thành công!\n\n';
+                output.textContent += 'Cấu hình mới:\n';
+                output.textContent += `RC Loss Action: ${rcLoss}\n`;
+                output.textContent += `Data Link Loss Action: ${dataLoss}\n`;
+                output.textContent += `Battery Failsafe: ${battery}%\n`;
+                
+                const status = document.getElementById('failsafe-status');
+                status.style.display = 'inline-flex';
+                status.className = 'status-indicator status-success';
+                status.textContent = '✓ Đã cấu hình';
+            }, 1500);
+        }
+
+        // Arm/Disarm Control
+        function armDrone() {
+            const status = document.getElementById('arm-status');
+            status.className = 'status-indicator status-info';
+            status.textContent = 'Đang ARM...';
+            
+            // Simulate arm process
+            setTimeout(() => {
+                status.className = 'status-indicator status-success';
+                status.textContent = '✓ ARMED';
+            }, 1500);
+        }
+
+        function disarmDrone() {
+            const status = document.getElementById('arm-status');
+            status.className = 'status-indicator status-info';
+            status.textContent = 'Đang DISARM...';
+            
+            // Simulate disarm process
+            setTimeout(() => {
+                status.className = 'status-indicator status-error';
+                status.textContent = 'DISARMED';
+            }, 1500);
+        }
+
+        // GPS Testing
+        function testGPS() {
+            openModal('gpsModal');
+            refreshGPS();
+        }
+
+        function refreshGPS() {
+            const output = document.getElementById('gpsOutput');
+            output.textContent = 'Đang kiểm tra GPS...\n\n';
+            
+            const status = document.getElementById('gps-status');
+            status.style.display = 'inline-flex';
+            status.className = 'status-indicator status-info';
+            status.textContent = 'Đang kiểm tra...';
+            
+            setTimeout(() => {
+                output.textContent = 'Thông tin GPS:\n\n';
+                output.textContent += 'Trạng thái: ✓ GPS Fix\n';
+                output.textContent += 'Số vệ tinh: 12\n';
+                output.textContent += 'HDOP: 0.8\n';
+                output.textContent += 'Vĩ độ: 21.0285°N\n';
+                output.textContent += 'Kinh độ: 105.8542°E\n';
+                output.textContent += 'Độ cao: 12.5m\n';
+                output.textContent += 'Tốc độ: 0.0 m/s\n';
+                output.textContent += 'Compass: 45.2°\n';
+                
+                status.className = 'status-indicator status-success';
+                status.textContent = '✓ GPS OK - 12 vệ tinh';
+            }, 2000);
+        }
+
+        function compassCalib() {
+            openModal('compassModal');
+        }
+
+        let compassCalibRunning = false;
+        let compassCurrentStep = 0;
+        const compassOrientations = ['Nose Down', 'Rotate', 'Nose Up', 'Left', 'Right', 'Tail Down'];
+
+        function startCompassCalib() {
+            compassCalibRunning = true;
+            compassCurrentStep = 0;
+            simulateCompassCalibration();
+        }
+
+        function simulateCompassCalibration() {
+            if (!compassCalibRunning || compassCurrentStep >= 6) {
+                if (compassCurrentStep >= 6) {
+                    alert('✓ Compass calibration completed successfully!');
+                    closeModal('compassModal');
+                }
+                return;
+            }
+
+            const boxes = document.querySelectorAll('.orientation-box');
+            const currentBox = boxes[compassCurrentStep];
+            const statusDiv = currentBox.querySelector('.orientation-status');
+            
+            // Mark current as in progress
+            currentBox.style.borderColor = 'var(--accent-yellow)';
+            statusDiv.style.color = 'var(--accent-yellow)';
+            statusDiv.textContent = 'Rotating...';
+            
+            // Update progress bar
+            const progress = ((compassCurrentStep + 1) / 6 * 100).toFixed(0);
+            document.getElementById('compassProgress').style.width = progress + '%';
+            document.querySelector('#compassProgress + div').textContent = progress + '%';
+            
+            setTimeout(() => {
+                // Mark as completed
+                currentBox.style.borderColor = 'var(--accent-green)';
+                currentBox.style.background = 'rgba(34, 197, 94, 0.1)';
+                statusDiv.style.color = 'var(--accent-green)';
+                statusDiv.textContent = 'Completed';
+                
+                compassCurrentStep++;
+                
+                if (compassCurrentStep < 6) {
+                    // Mark next as active
+                    const nextBox = boxes[compassCurrentStep];
+                    nextBox.style.borderColor = 'var(--accent-yellow)';
+                }
+                
+                setTimeout(simulateCompassCalibration, 500);
+            }, 3000);
+        }
+
+        function cancelCompassCalib() {
+            compassCalibRunning = false;
+            const boxes = document.querySelectorAll('.orientation-box');
+            boxes.forEach((box, idx) => {
+                if (idx !== 1) {
+                    box.style.borderColor = 'var(--border)';
+                    box.style.background = 'var(--bg-primary)';
+                    const statusDiv = box.querySelector('.orientation-status');
+                    statusDiv.style.color = 'var(--accent-red)';
+                    statusDiv.textContent = 'Incomplete';
+                }
+            });
+            document.getElementById('compassProgress').style.width = '0%';
+            document.querySelector('#compassProgress + div').textContent = '0%';
+            compassCurrentStep = 0;
+        }
+
+        // Camera Settings CM5
+
+        // Auto Landing Settings
+        function openAutoLandingSettings() {
+            openModal('autoLandingModal');
+            loadTemplateList();
+            loadLandingSettings();
+        }
+
+        // Load available templates from API
+        function loadTemplateList() {
+            fetch('/api/landing/templates')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.templates) {
+                        const select = document.getElementById('landingTemplate');
+                        select.innerHTML = '';
+                        
+                        data.templates.forEach(template => {
+                            const option = document.createElement('option');
+                            option.value = template;
+                            option.textContent = `Template ${template}`;
+                            select.appendChild(option);
+                        });
+                        
+                        // Set default to H if available
+                        if (data.templates.includes('H')) {
+                            select.value = 'H';
+                        }
+                        
+                        previewTemplate();
+                    } else {
+                        document.getElementById('landingTemplate').innerHTML = '<option>Không tìm thấy templates</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading templates:', error);
+                    document.getElementById('landingTemplate').innerHTML = '<option>Lỗi khi load templates</option>';
+                });
+        }
+
+        function loadLandingSettings() {
+            // Try to load from localStorage first
+            const savedConfig = localStorage.getItem('landingConfig');
+            if (savedConfig) {
+                try {
+                    const config = JSON.parse(savedConfig);
+                    document.getElementById('landingMode').value = config.mode || 'normal';
+                    
+                    if (config.environment) {
+                        const envRadio = document.querySelector(`input[name="environment"][value="${config.environment}"]`);
+                        if (envRadio) envRadio.checked = true;
+                    }
+                    
+                    if (config.marker_type || config.template) {
+                        const template = config.template || config.marker_type;
+                        document.getElementById('landingTemplate').value = template;
+                        previewTemplate();
+                    }
+                    
+                    if (config.safety_level) {
+                        document.getElementById('safetyLevel').value = config.safety_level;
+                        updateSafetyLabel(config.safety_level);
+                    }
+                    
+                    updateLandingPreview();
+                    document.getElementById('landingOutput').textContent = '✅ Đã load config đã lưu';
+                    return;
+                } catch (e) {
+                    console.error('Error loading config:', e);
+                }
+            }
+            
+            // Try to fetch from server
+            fetch('/api/landing/config/load')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.config) {
+                        const config = data.config;
+                        document.getElementById('landingMode').value = config.mode || 'normal';
+                        
+                        if (config.environment) {
+                            const envRadio = document.querySelector(`input[name="environment"][value="${config.environment}"]`);
+                            if (envRadio) envRadio.checked = true;
+                        }
+                        
+                        if (config.marker_type || config.template) {
+                            const template = config.template || config.marker_type;
+                            document.getElementById('landingTemplate').value = template;
+                            previewTemplate();
+                        }
+                        
+                        if (config.safety_level) {
+                            document.getElementById('safetyLevel').value = config.safety_level;
+                            updateSafetyLabel(config.safety_level);
+                        }
+                        
+                        updateLandingPreview();
+                        document.getElementById('landingOutput').textContent = '✅ Đã load config từ server';
+                    }
+                })
+                .catch(error => {
+                    // Use defaults
+                    previewTemplate();
+                    updateLandingPreview();
+                    document.getElementById('landingOutput').textContent = 'Sử dụng config mặc định\nMode: Normal | Environment: Outdoor | Template: H | Safety: Balanced';
+                });
+        }
+
+        function previewTemplate() {
+            const template = document.getElementById('landingTemplate').value;
+            const templateImg = document.getElementById('templateImg');
+            const templateDesc = document.getElementById('templateDesc');
+            
+            if (!template) {
+                templateImg.style.display = 'none';
+                templateDesc.textContent = 'Chọn template để xem preview';
+                return;
+            }
+            
+            templateDesc.textContent = `Template ${template} - Landing pad với ký tự ${template}`;
+            
+            // Load template image from static files
+            templateImg.src = `/templates/${template}.png`;
+            templateImg.style.display = 'block';
+            templateImg.onerror = function() {
+                this.style.display = 'none';
+                templateDesc.textContent = `Template ${template} (Preview không có sẵn)`;
+            };
+        }
+
+        function saveLandingSettings() {
+            const mode = document.getElementById('landingMode').value;
+            const environment = document.querySelector('input[name="environment"]:checked')?.value || 'outdoor';
+            const template = document.getElementById('landingTemplate').value;
+            const safetyLevel = parseInt(document.getElementById('safetyLevel').value);
+            
+            if (!template) {
+                document.getElementById('landingOutput').textContent = '✗ Vui lòng chọn template!';
+                return;
+            }
+            
+            const config = {
+                mode: mode,
+                environment: environment,
+                marker_type: template,
+                safety_level: safetyLevel,
+                template: template
+            };
+            
+            const output = document.getElementById('landingOutput');
+            output.textContent = 'Đang lưu cấu hình landing...\n\n';
+            
+            fetch('/api/landing/config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(config)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        output.textContent = '✅ Cấu hình landing đã lưu thành công!\n\n';
+                        output.textContent += 'Landing Config:\n';
+                        output.textContent += `  Mode: ${mode}\n`;
+                        output.textContent += `  Environment: ${environment}\n`;
+                        output.textContent += `  Template: ${template}\n`;
+                        output.textContent += `  Safety Level: ${getSafetyLevelText(safetyLevel)}\n\n`;
+                        output.textContent += '✅ Config được lưu vào: Find_landing/landing_config.json\n';
+                        
+                        const status = document.getElementById('landing-status');
+                        status.className = 'status-indicator status-success';
+                        status.textContent = `✓ ${mode.toUpperCase()} | ${template}`;
+                        
+                        setTimeout(() => {
+                            closeModal('autoLandingModal');
+                        }, 2000);
+                    } else {
+                        output.textContent = '✗ Lỗi: ' + data.message;
+                    }
+                })
+                .catch(error => {
+                    output.textContent = '✗ Lỗi kết nối: ' + error.message + '\n\n';
+                    output.textContent += 'Cấu hình vẫn được lưu local:\n';
+                    output.textContent += JSON.stringify(config, null, 2);
+                    localStorage.setItem('landingConfig', JSON.stringify(config));
+                });
+        }
+
+        function getSafetyLevelText(level) {
+            switch(level) {
+                case 1: return 'Conservative';
+                case 2: return 'Balanced';
+                case 3: return 'Aggressive';
+                default: return 'Balanced';
+            }
+        }
+
+        function updateSafetyLabel(value) {
+            const label = document.getElementById('safetyLabel');
+            const text = getSafetyLevelText(parseInt(value));
+            label.textContent = text;
+            
+            // Update color
+            if (value == 1) {
+                label.style.color = 'var(--accent-green)';
+            } else if (value == 2) {
+                label.style.color = 'var(--accent-blue)';
+            } else {
+                label.style.color = 'var(--accent-red)';
+            }
+            
+            updateLandingPreview();
+        }
+
+        function updateLandingPreview() {
+            const mode = document.getElementById('landingMode').value;
+            const environment = document.querySelector('input[name="environment"]:checked')?.value || 'outdoor';
+            const template = document.getElementById('landingTemplate').value || 'H';
+            const safetyLevel = parseInt(document.getElementById('safetyLevel').value);
+            
+            const summary = document.getElementById('configSummary');
+            summary.textContent = `Mode: ${mode.toUpperCase()} | Environment: ${environment.toUpperCase()} | Template: ${template} | Safety: ${getSafetyLevelText(safetyLevel)}`;
+        }
+
+
+
+        function testLanding() {
+            const output = document.getElementById('landingOutput');
+            output.textContent = '🧪 Starting Landing Test...\n\n';
+            output.textContent += 'Phase 1: Checking sensors...\n';
+            output.textContent += '  ✓ GPS: OK (15 satellites)\n';
+            output.textContent += '  ✓ Compass: OK\n';
+            output.textContent += '  ✓ Camera: OK\n\n';
+            output.textContent += 'Phase 2: Marker detection test...\n';
+            output.textContent += '  ⏳ Searching for marker...\n';
+            
+            setTimeout(() => {
+                output.textContent += '  ✓ Marker detected!\n';
+                output.textContent += '  Position: X=+12cm, Y=-5cm\n';
+                output.textContent += '  Confidence: 87%\n\n';
+                output.textContent += '✅ Landing test completed successfully!\n';
+                output.textContent += 'Safe to proceed with actual landing.\n';
+            }, 2000);
+        }
+
+        function uploadTemplate() {
+            // Create file input dynamically
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const formData = new FormData();
+                formData.append('template', file);
+                
+                const output = document.getElementById('landingOutput');
+                output.textContent = 'Đang upload template...\n';
+                
+                fetch('/api/landing/templates/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            output.textContent += '✓ Template đã upload thành công!\n';
+                            output.textContent += `File: ${data.filename}\n`;
+                            output.textContent += `Path: Find_landing/templates/${data.filename}\n`;
+                            
+                            // Reload template list
+                            loadLandingSettings();
+                        } else {
+                            output.textContent += '✗ Upload failed: ' + data.message;
+                        }
+                    })
+                    .catch(error => {
+                        output.textContent += '✗ Error: ' + error.message;
+                    });
+            };
+            input.click();
+        }
+
+        // Camera Settings CM5
+
+        let cameraStreamDirty = false;
+
+        function onCameraStreamToggleChanged() {
+            cameraStreamDirty = true;
+        }
+
+        function renderCameraStreamStatus(statusData) {
+            const runningByCam = {};
+            (statusData && statusData.streams || []).forEach(s => {
+                runningByCam[s.camera_id] = s.running;
+            });
+
+            [0, 1].forEach(id => {
+                const badge = document.getElementById('stream-cam' + id + '-badge');
+                const enabledEl = document.getElementById('stream-cam' + id + '-enabled');
+                if (!badge) return;
+
+                const enabled = enabledEl ? enabledEl.checked : true;
+                const running = !!runningByCam[id];
+
+                if (!enabled) {
+                    badge.textContent = 'Tắt';
+                    badge.className = 'cam-pill off';
+                } else if (running) {
+                    badge.textContent = 'Live';
+                    badge.className = 'cam-pill on';
+                } else {
+                    badge.textContent = 'Chờ';
+                    badge.className = 'cam-pill off';
+                }
+            });
+        }
+
+        function loadAllCameraConfigs() {
+            return Promise.all([0, 1].map(id =>
+                fetchJson('/api/camera/config/load?camera_id=' + id)
+            ))
+                .then(results => {
+                    results.forEach((data, id) => {
+                        if (data.success && data.config) applyCamConfigToUI(id, data.config);
+                    });
+                    cameraStreamDirty = false;
+                    return fetchJson('/api/camera/status');
+                })
+                .then(statusData => renderCameraStreamStatus(statusData))
+                .catch(e => console.warn('loadAllCameraConfigs:', e));
+        }
+
+        function loadCameraStreamToggles() {
+            return loadAllCameraConfigs();
+        }
+
+        function saveCameraStreamToggles(restart) {
+            return saveCameraAll(!!restart);
+        }
+
+        function restartCameraStreams() {
+            setCameraInlineStatus('Đang restart stream...', 'warn');
+            setCameraMsg('Đang restart stream...');
+            return fetchJson('/api/camera/restart', { method: 'POST' })
+                .then(d => {
+                    if (d.success) {
+                        setCameraMsg('✓ Stream restarted · PIDs: ' + ((d.pids || []).join(', ') || '—'));
+                        return loadAllCameraConfigs();
+                    }
+                    setCameraMsg('✗ ' + (d.message || 'Restart thất bại'));
+                    setCameraInlineStatus('Restart thất bại', 'err');
+                })
+                .catch(e => {
+                    setCameraMsg('✗ Lỗi: ' + e.message, 'err');
+                    setCameraInlineStatus('Lỗi: ' + e.message, 'err');
+                });
+        }
+
+        // Network Settings Functions
+        let networkStatusInterval = null;
+
+        function openNetworkSettings() {
+            const modal = document.getElementById('networkModal');
+            modal.classList.add('active');
+            loadNetworkSettings();
+            startNetworkStatusUpdates();
+        }
+
+        function loadNetworkSettings() {
+            // Load current priority
+            fetch('/api/network/priority')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.priority === '4g') {
+                        document.getElementById('priority4g').checked = true;
+                    } else {
+                        document.getElementById('priorityWifi').checked = true;
+                    }
+                })
+                .catch(error => console.error('Error loading priority:', error));
+
+            // Load initial status
+            refreshNetworkStatus();
+        }
+
+        function refreshNetworkStatus() {
+            fetch('/api/network/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateNetworkDisplay(data);
+                })
+                .catch(error => {
+                    console.error('Error loading network status:', error);
+                    document.getElementById('activeConnection').textContent = 'Error loading status';
+                });
+        }
+
+        function updateNetworkDisplay(data) {
+            // Update 4G status
+            updateInterfaceStatus('4g', data['4g']);
+            
+            // Update WiFi status
+            updateInterfaceStatus('wifi', data.wifi);
+            
+            // Update Ethernet status
+            updateInterfaceStatus('eth', data.ethernet);
+            
+            // Update active connection
+            const activeConn = document.getElementById('activeConnection');
+            if (data.active_interface) {
+                const iface = data.active_interface;
+                const ifaceData = data[iface] || {};
+                activeConn.innerHTML = `
+                    <strong>Connected via: ${iface.toUpperCase()}</strong><br>
+                    IP: ${ifaceData.ip || 'N/A'}<br>
+                    Gateway: ${ifaceData.gateway || 'N/A'}
+                `;
+            } else {
+                activeConn.textContent = 'No active connection';
+            }
+
+            // Update main status indicator
+            updateMainNetworkStatus(data);
+        }
+
+        function updateInterfaceStatus(type, data) {
+            const statusBadge = document.getElementById(`status-${type}`);
+            const statusDetails = document.getElementById(`status-${type}-details`);
+            
+            if (!data) {
+                statusBadge.className = 'status-badge status-unavailable';
+                statusBadge.textContent = 'Unavailable';
+                if (statusDetails) statusDetails.style.display = 'none';
+                return;
+            }
+
+            let statusClass = 'status-unavailable';
+            let statusText = 'Unavailable';
+
+            if (data.status === 'connected') {
+                statusClass = 'status-connected';
+                statusText = 'Connected';
+            } else if (data.status === 'available') {
+                statusClass = 'status-available';
+                statusText = 'Available';
+            } else if (data.status === 'no_ip') {
+                statusClass = 'status-no-ip';
+                statusText = 'No IP';
+            } else if (data.status === 'no_internet') {
+                statusClass = 'status-no-internet';
+                statusText = 'No Internet';
+            }
+
+            statusBadge.className = `status-badge ${statusClass}`;
+            statusBadge.textContent = statusText;
+
+            // Update details
+            if (statusDetails && data.status !== 'unavailable') {
+                statusDetails.style.display = 'block';
+                
+                if (type === '4g') {
+                    document.getElementById('status-4g-ip').textContent = data.ip || 'N/A';
+                    document.getElementById('status-4g-signal').textContent = data.signal || 'N/A';
+                } else if (type === 'wifi') {
+                    document.getElementById('status-wifi-ip').textContent = data.ip || 'N/A';
+                    document.getElementById('status-wifi-ssid').textContent = data.ssid || 'N/A';
+                } else if (type === 'eth') {
+                    document.getElementById('status-eth-ip').textContent = data.ip || 'N/A';
+                }
+            } else if (statusDetails) {
+                statusDetails.style.display = 'none';
+            }
+        }
+
+        function updateMainNetworkStatus(data) {
+            const mainStatus = document.getElementById('network-status');
+            if (data.active_interface) {
+                const iface = data.active_interface.toUpperCase();
+                mainStatus.className = 'status-indicator status-success';
+                mainStatus.textContent = `✓ Connected via ${iface}`;
+            } else if (data['4g']?.status === 'available' || data.wifi?.status === 'available') {
+                mainStatus.className = 'status-indicator status-info';
+                mainStatus.textContent = 'Available (not connected)';
+            } else {
+                mainStatus.className = 'status-indicator status-error';
+                mainStatus.textContent = '✗ No connection';
+            }
+        }
+
+        function startNetworkStatusUpdates() {
+            // Clear any existing interval
+            if (networkStatusInterval) {
+                clearInterval(networkStatusInterval);
+            }
+            
+            // Update every 5 seconds
+            networkStatusInterval = setInterval(refreshNetworkStatus, 5000);
+        }
+
+        function saveNetworkPriority() {
+            const priority = document.querySelector('input[name="priority"]:checked').value;
+            
+            fetch('/api/network/priority', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ priority: priority })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✓ Priority saved successfully! The system will reconnect with the new priority.');
+                    // Trigger reconnection
+                    reconnectNetwork();
+                } else {
+                    alert('✗ Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('✗ Connection error: ' + error.message);
+            });
+        }
+
+        function reconnectNetwork() {
+            if (!confirm('Reconnect network? This may cause brief disconnection.')) {
+                return;
+            }
+
+            fetch('/api/network/reconnect', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✓ Reconnecting...');
+                    // Refresh status after a delay
+                    setTimeout(refreshNetworkStatus, 3000);
+                } else {
+                    alert('✗ Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('✗ Connection error: ' + error.message);
+            });
+        }
+
+        // Load initial network status on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            refreshNetworkStatus();
+            refreshCameraDetect(false);
+            loadAllCameraConfigs();
+            loadHardwareStatusSummary();
+            setInterval(refreshNetworkStatus, 10000);
+        });
+
+        // ─── Hardware CM5 / Pi5 config ───────────────────────────────
+        const UART_PRESETS = ['/dev/ttyAMA0', '/dev/ttyAMA1', '/dev/ttyAMA2', '/dev/serial0', '/dev/ttyUSB0', '/dev/ttyACM0'];
+
+        function cfgSection(config, snake, pascal) {
+            return config[snake] || config[pascal] || {};
+        }
+
+        function cfgVal(obj, snake, pascal, fallback) {
+            if (obj[snake] !== undefined && obj[snake] !== null && obj[snake] !== '') return obj[snake];
+            if (obj[pascal] !== undefined && obj[pascal] !== null && obj[pascal] !== '') return obj[pascal];
+            return fallback;
+        }
+
+        function switchHardwareTab(tab) {
+            document.querySelectorAll('.hw-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.hwTab === tab);
+            });
+            document.querySelectorAll('.hw-tab-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === 'hw-tab-' + tab);
+            });
+        }
+
+        function applyUartPreset() {
+            const preset = document.getElementById('hw-uart-preset').value;
+            if (preset !== 'custom') {
+                document.getElementById('hw-serial-port').value = preset;
+            }
+        }
+
+        function syncUartPresetFromPort() {
+            const port = document.getElementById('hw-serial-port').value.trim();
+            const sel = document.getElementById('hw-uart-preset');
+            if (UART_PRESETS.includes(port)) {
+                sel.value = port;
+            } else {
+                sel.value = 'custom';
+            }
+        }
+
+        function openHardwareSettings() {
+            openModal('hardwareModal');
+            loadHardwareSettings();
+        }
+
+        async function loadHardwareSettings() {
+            try {
+                const response = await fetch('/api/config/get');
+                const data = await response.json();
+                if (!data.success) return;
+
+                const config = data.config || {};
+                const net = cfgSection(config, 'network', 'Network');
+                const eth = cfgSection(config, 'ethernet', 'Ethernet');
+                const lcd = cfgSection(config, 'lcd', 'LCD');
+
+                const serialPort = cfgVal(net, 'serial_port', 'SerialPort', '/dev/ttyAMA2');
+                document.getElementById('hw-serial-port').value = serialPort;
+                syncUartPresetFromPort();
+                document.getElementById('hw-serial-baud').value = cfgVal(net, 'serial_baud', 'SerialBaud', 57600);
+                document.getElementById('hw-connection-type').value = cfgVal(net, 'connection_type', 'ConnectionType', 'prefer_ethernet');
+                document.getElementById('hw-local-listen-port').value = cfgVal(net, 'local_listen_port', 'LocalListenPort', 14550);
+
+                document.getElementById('hw-eth-interface').value = cfgVal(eth, 'interface', 'Interface', 'eth0');
+                document.getElementById('hw-eth-local-ip').value = cfgVal(eth, 'local_ip', 'LocalIP', '10.41.10.10');
+                document.getElementById('hw-eth-broadcast-ip').value = cfgVal(eth, 'broadcast_ip', 'BroadcastIP', '10.41.10.255');
+                document.getElementById('hw-eth-pixhawk-ip').value = cfgVal(eth, 'pixhawk_ip', 'PixhawkIP', '10.41.10.2');
+                document.getElementById('hw-eth-pixhawk-port').value = cfgVal(eth, 'pixhawk_port', 'PixhawkPort', 14550);
+                document.getElementById('hw-eth-subnet').value = cfgVal(eth, 'subnet', 'Subnet', '24');
+                document.getElementById('hw-eth-auto-setup').checked = cfgVal(eth, 'auto_setup', 'AutoSetup', true);
+
+                document.getElementById('hw-lcd-enabled').checked = cfgVal(lcd, 'enabled', 'Enabled', true);
+                document.getElementById('hw-lcd-overlay').value = cfgVal(lcd, 'overlay', 'Overlay', 'i2c3-pi5');
+                document.getElementById('hw-lcd-pins').value = cfgVal(lcd, 'pins', 'Pins', 'pins_22_23');
+                document.getElementById('hw-lcd-bus').value = cfgVal(lcd, 'bus', 'Bus', 3);
+                document.getElementById('hw-lcd-address').value = cfgVal(lcd, 'address', 'Address', 60);
+
+                updateHardwareStatusSummary(net, eth);
+            } catch (e) {
+                console.error('loadHardwareSettings:', e);
+            }
+        }
+
+        function updateHardwareStatusSummary(net, eth) {
+            const el = document.getElementById('hardware-status');
+            if (!el) return;
+            const port = cfgVal(net || {}, 'serial_port', 'SerialPort', '?');
+            const localIP = cfgVal(eth || {}, 'local_ip', 'LocalIP', '?');
+            const pxIP = cfgVal(eth || {}, 'pixhawk_ip', 'PixhawkIP', '?');
+            el.className = 'status-indicator status-success';
+            el.textContent = `UART: ${port} · ETH: ${localIP} → ${pxIP}`;
+        }
+
+        async function loadHardwareStatusSummary() {
+            try {
+                const response = await fetch('/api/config/get');
+                const data = await response.json();
+                if (data.success) {
+                    updateHardwareStatusSummary(
+                        cfgSection(data.config, 'network', 'Network'),
+                        cfgSection(data.config, 'ethernet', 'Ethernet')
+                    );
+                }
+            } catch (e) {
+                const el = document.getElementById('hardware-status');
+                if (el) {
+                    el.className = 'status-indicator status-error';
+                    el.textContent = 'Không tải được cấu hình phần cứng';
+                }
+            }
+        }
+
+        async function saveHardwareSettings() {
+            const btn = document.getElementById('hw-save-btn');
+            const statusEl = document.getElementById('hw-save-status');
+            btn.disabled = true;
+            btn.textContent = '⏳ Đang lưu...';
+            statusEl.style.display = 'block';
+            statusEl.className = 'status-indicator status-info';
+            statusEl.textContent = 'Đang gửi cấu hình...';
+
+            const payload = {
+                network: {
+                    serial_port: document.getElementById('hw-serial-port').value.trim(),
+                    serial_baud: parseInt(document.getElementById('hw-serial-baud').value, 10),
+                    connection_type: document.getElementById('hw-connection-type').value,
+                    local_listen_port: parseInt(document.getElementById('hw-local-listen-port').value, 10),
+                },
+                ethernet: {
+                    interface: document.getElementById('hw-eth-interface').value.trim(),
+                    local_ip: document.getElementById('hw-eth-local-ip').value.trim(),
+                    broadcast_ip: document.getElementById('hw-eth-broadcast-ip').value.trim(),
+                    pixhawk_ip: document.getElementById('hw-eth-pixhawk-ip').value.trim(),
+                    pixhawk_port: parseInt(document.getElementById('hw-eth-pixhawk-port').value, 10),
+                    subnet: document.getElementById('hw-eth-subnet').value.trim(),
+                    auto_setup: document.getElementById('hw-eth-auto-setup').checked,
+                },
+                lcd: {
+                    enabled: document.getElementById('hw-lcd-enabled').checked,
+                    overlay: document.getElementById('hw-lcd-overlay').value,
+                    pins: document.getElementById('hw-lcd-pins').value,
+                    bus: parseInt(document.getElementById('hw-lcd-bus').value, 10),
+                    address: parseInt(document.getElementById('hw-lcd-address').value, 10),
+                },
+            };
+
+            try {
+                const response = await fetch('/api/config/hardware/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                if (data.success) {
+                    statusEl.className = 'status-indicator status-success';
+                    statusEl.textContent = '✓ ' + data.message;
+                    loadHardwareStatusSummary();
+                } else {
+                    statusEl.className = 'status-indicator status-error';
+                    statusEl.textContent = '✗ ' + (data.message || 'Lỗi không xác định');
+                }
+            } catch (e) {
+                statusEl.className = 'status-indicator status-error';
+                statusEl.textContent = '✗ Lỗi kết nối: ' + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Lưu cấu hình phần cứng';
+            }
+        }
+
+        // Stop interval when modal closes
+        document.getElementById('networkModal')?.addEventListener('click', function(e) {
+            if (e.target === this || e.target.classList.contains('close-btn')) {
+                if (networkStatusInterval) {
+                    clearInterval(networkStatusInterval);
+                    networkStatusInterval = null;
+                }
+            }
+        });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>

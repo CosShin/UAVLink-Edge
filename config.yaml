@@ -1,50 +1,90 @@
-# File Cấu hình UAVLink-Edge-Python (Dành riêng cho Pi 5)
-
-# -- Định danh Drone (Identity) --
 auth:
-    enabled: true
-    host: "45.117.171.237"
-    port: 5770
-    uuid: "00000011-0000-0000-0000-000000000011" # UUID định danh của Drone
-    shared_secret: "drone-fleet-shared-secret-auth-key-2025"
-    keepalive_interval: 30
-
-# -- Cấu hình cổng MAVLink (Kết nối với Pixhawk) --
-# connection_type có thể là: "serial", "tcp_listen", "tcp_client", "udp_listen"
+  enabled: true
+  host: 45.117.171.237
+  port: 5770
+  uuid: 00000011-0000-0000-0000-000000000011
+  shared_secret: drone-fleet-shared-secret-auth-key-2025
+  keepalive_interval: 30
+network:
+  connection_type: serial
+  serial_port: /dev/ttyAMA2
+  serial_baud: 921600
+  tcp_host: 0.0.0.0
+  tcp_port: 14540
+  local_listen_port: 14540
+  target_host: 10.8.0.1
+  target_port: 14550
+  protocol: udp
+  mode: wifi_only
 mavlink:
-    connection_type: "serial" # Các giá trị: "serial", "tcp_listen", "tcp_client", v.v.
-    
-    # Cấu hình cho UART / Serial
-    serial_port: "/dev/ttyAMA2" # Pi 5 UART2 (GPIO 4-7) — dtoverlay=uart2-pi5 trong config.txt
-    serial_baud: 57600
-    
-    # Cấu hình cho TCP
-    tcp_host: "0.0.0.0" # Sử dụng cho "tcp_listen" (udpin)
-    tcp_port: 14540     # Cổng cho luồng dữ liệu mavlink
-    
-# -- Cấu hình Forwarding lên Fleet Server (Dữ liệu server) --
+  connection_type: serial
+  serial_port: /dev/ttyAMA2
+  serial_baud: 921600
+  tcp_host: 0.0.0.0
+  tcp_port: 14540
 forwarding:
-    target_host: "10.8.0.1"
-    target_port: 14550
-    protocol: "udp"
-
-# -- Giao diện giám sát Web --
+  target_host: 10.8.0.1
+  target_port: 14550
+  protocol: udp
 web:
-    port: 8080
-
-# -- Cấu hình truyền Video Stream (H.264) --
+  port: 8080
+camera:
+  enabled: true
+  auto_start: false
+  mediamtx_port: 8554
+  mediamtx_webrtc_port: 8889
+  mediamtx_hls_port: 8888
+  publish_path_cam0_suffix: cam0
+  publish_path_cam1_suffix: cam1
+  streams:
+  - name: cam0
+    camera_id: 0
+    enabled: false
+    size:
+    - 640
+    - 480
+    framerate: 30
+    bitrate: 5000
+    format: RGB888
+    brightness: 0.0
+    contrast: 1.0
+    exposure_time: 0
+    detection_enabled: true
+    overlay_enabled: true
+    keyframe_interval: 30
+    preset: ultrafast
+    tune: zerolatency
+  - name: cam1
+    camera_id: 1
+    enabled: false
+    size:
+    - 640
+    - 480
+    framerate: 30
+    bitrate: 5000
+    format: RGB888
+    brightness: 0.0
+    contrast: 1.0
+    exposure_time: 0
+    detection_enabled: false
+    overlay_enabled: false
+    keyframe_interval: 30
+    preset: ultrafast
+    tune: zerolatency
 video:
-    # source: "picamera" (Pi Cam Module 3) hoặc "usb"
-    source: "picamera"
-    mediamtx_rtsp: "rtsp://45.117.171.237:8554"
-    stream_name: "drone28" # Thường trùng với drone_uuid hoặc tên hiển thị
-    usb_device: "/dev/video0"
-    width: 1280
-    height: 720
-    fps: 30
-    bitrate_kbps: 2000
-
-# -- Cấu hình Log --
+  source: none
+  mediamtx_rtsp: rtsp://45.117.171.237:8554
+  stream_name: drone28
+  usb_device: /dev/video0
+  width: 1280
+  height: 720
+  fps: 30
+  bitrate_kbps: 2000
 log:
-    level: "info"
-    verbose: false
+  level: info
+  verbose: false
+vpn:
+  enabled: true
+  config_file: vpn_config.json
+  server_endpoint: 45.117.171.237:51820
+  router_vpn_ip: 10.8.0.1
