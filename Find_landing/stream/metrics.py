@@ -41,6 +41,8 @@ def write_landing_telemetry(camera_id: int, detection: dict, detections_count: i
         payload = {
             "camera_id": camera_id,
             "detected": bool(det.get("detected")),
+            "hold": bool(det.get("hold")),
+            "hold_age_ms": det.get("hold_age_ms"),
             "offset_x": det.get("offset_x"),
             "offset_y": det.get("offset_y"),
             "direction": det.get("direction"),

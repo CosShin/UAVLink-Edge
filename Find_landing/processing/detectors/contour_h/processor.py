@@ -13,6 +13,7 @@ class ContourHProcessor(FrameProcessor):
         threshold: float = 0.8,
         allow_fullframe_fallback: bool = True,
         detect_size: tuple[int, int] | None = None,
+        lost_hold_ms: int = 1500,
     ):
         self.template_contour = template_contour
         self.enabled = enabled
@@ -20,7 +21,7 @@ class ContourHProcessor(FrameProcessor):
         self.threshold = float(threshold)
         self.allow_fullframe_fallback = bool(allow_fullframe_fallback)
         self.detect_size = detect_size or (320, 240)
-        self._stable = StableTracker()
+        self._stable = StableTracker(lost_hold_ms=lost_hold_ms)
 
     def process(self, frame_bgr, meta: FrameMeta, state: dict) -> None:
         if not self.enabled or not self.wants_frame(meta.frame_id):

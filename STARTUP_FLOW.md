@@ -1,125 +1,146 @@
 # UAVLink-Edge Startup Flow
 
-> Phiên bản: 5.0 — Cập nhật theo code thực tế (`main.py`)
-> Cập nhật: 2026-04-01
+> Phiên bản: 6.0 — `main.py` user-run (`./run.sh`)  
+> Cập nhật: 2026-07-13
 
 ---
 
-## Toàn cảnh hệ thống (Boot Order)
+## Cách chạy
+
+```bash
+./run.sh              # khuyến nghị
+./run.sh --register   # đăng ký lần đầu
+sudo ./run.sh         # khi VPN / gán IP eth0 cần root lần đầu
+```
+
+Chỉ **một** instance được phép (`instance_lock.py` → `data/uavlink-edge.lock`).
+
+---
+
+## Boot order (user-run, không systemd)
 
 ```
-Pi CM5 Boot
+Người dùng chạy ./run.sh
     │
-    └─ UAVLink-Edge.service (user pi)
-        └─ python main.py → MAVLink + Authentication (WiFi-only mode)
+    ├─ venv re-exec (nếu gọi nhầm system python / sudo python)
+    ├─ acquire_instance_lock()
+    ├─ Load config.yaml
+    ├─ VPN start (nếu đã có vpn_config.json)
+    ├─ Web server :8080
+    ├─ Network monitor (Module_4G/connection_manager.py, optional)
+    ├─ wait_for_cloud_egress() — ngắn nếu không có wwan0
+    ├─ auth.start() — TCP HMAC
+    ├─ VPN provision / rebind uplink socket
+    ├─ ensure_ethernet_ready() — gán 10.41.10.10/24 nếu auto_setup
+    ├─ fwd.start() — MAVLink listener + uplink/downlink
+    ├─ camera_mavlink / landing_mavlink bridges
+    └─ while True (chờ SIGINT)
 ```
 
-*(Lưu ý: Chế độ 4G và PBR routing đã được gỡ bỏ theo cấu trúc mới, hệ thống chỉ chạy WiFi-only)*
+*(Không cài `UAVLink-Edge.service` mặc định — tắt `dronebridge.service` nếu trùng port 8080.)*
 
 ---
 
-## Startup Flow — `main.py` (UAVLink-Edge Python)
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  python main.py                                                     │
-└────────────────────────────┬────────────────────────────────────────┘
-                             │
-                             ▼
-              ┌──────────────────────────────┐
-              │  Parse/Load Config           │
-              │  cfg = Config("config.yaml") │
-              └──────────────┬───────────────┘
-                             │
-                             ▼
-              ┌──────────────────────────────────────────┐
-              │  Initialize Components                   │
-              │  auth = AuthClient(...)                  │
-              │  fwd = Forwarder(cfg, auth)              │
-              └──────────────────────┬───────────────────┘
-                                     │
-                                     ▼
-              ┌──────────────────────────────────────────┐
-              │  STEP 1: Start Web Server                │
-              │  start_server(port, fwd.stats, auth)     │
-              └──────────────────────┬───────────────────┘
-                                     │
-                                     ▼
-              ┌──────────────────────────────────────────┐
-              │  STEP 2: Authenticate với server         │
-              │  auth.start()                            │
-              │    → connect() & authenticate() [TCP]    │
-              │    → go keepalive_loop (Thread)          │
-              └──────────────────────┬───────────────────┘
-                                     │
-                                     ▼
-              ┌──────────────────────────────────────────┐
-              │  STEP 3: Start Forwarder                 │
-              │  fwd.start()                             │
-              │    → start_listener (Kết nối Pixhawk)    │
-              │    → go uplink_loop (Thread)             │
-              │    → go downlink_loop (Thread)           │
-              │    → go heartbeat_loop (Thread)          │
-              └──────────────────────┬───────────────────┘
-                                     │
-                                     ▼
-              ┌──────────────────────────────────────────┐
-              │  ✅ FULLY OPERATIONAL                    │
-              │                                          │
-              │  while True:                             │
-              │      time.sleep(1)                       │
-              └──────────────────────┬───────────────────┘
-                                     │ Ctrl+C / SIGTERM
-                                     ▼
-              ┌──────────────────────────────────────────┐
-              │  Graceful Shutdown                       │
-              │  signal_handler() → sys.exit(0)          │
-              └──────────────────────────────────────────┘
-```
-
----
-
-## Threads (Luồng) chạy khi OPERATIONAL
-
-| Thread | Module | Mô tả |
-|---|---|---|
-| `MainThread` | `main.py` | Giữ ứng dụng sống (`while True`) và bắt tín hiệu tắt (SIGINT/SIGTERM) |
-| `web_server` | `web_server.py` | Chạy Flask/HTTP server xử lý API request trên định tuyến `/` |
-| `keepalive_loop` | `auth_client.py` | Quản lý vòng đời TCP: Tự động gửi `SESSION_REFRESH` khi `< 30s` tới lúc hết hạn token. Thực hiện re-authenticate toàn bộ kèm *exponential backoff* nếu mất kết nối. |
-| `uplink_loop` | `forwarder.py` | Đọc MAVLink từ Pixhawk (`recv_match`) → Gửi lên Server (UDP) |
-| `downlink_loop` | `forwarder.py` | Nhận MAVLink từ Server về qua UDP socket → Gửi lại Pixhawk (`write`) |
-| `heartbeat_loop`| `forwarder.py` | Gửi gói `MSG_SESSION_REFRESH` (UDP) tới server mỗi giây để liên tục báo cáo endpoint |
-
----
-
-## Tính năng Đăng ký (Register)
-Thiết bị lần đầu tích hợp cần kết nối với server bằng lệnh `python main.py --register`. Lúc này script cấu hình tự động gửi tín hiệu `REGISTER_INIT`/`REGISTER_RESPONSE` và lưu key vào file cục bộ `.drone_secret` mà không spawn các luồng MAVLink.
-
-
----
-
-## Log Timeline — Khởi động thành công
+## Startup diagram
 
 ```text
-T+0.0s  [MAIN] INFO: 🚀 Starting UAVLink-Edge (Python Version) on Pi 5
-T+0.0s  [MAIN] INFO: Network mode: WiFi-only (4G disabled per request)
-T+0.0s  [MAIN] INFO: Configuration loaded successfully
-T+0.1s  [MAIN] INFO: Authenticating via public TCP...
-T+x.xs  [AuthClient] INFO: Loaded secret key from storage 
-T+x.xs  [AuthClient] INFO: Sent AUTH_INIT (UUID=...)
-T+x.xs  [AuthClient] INFO: Received challenge
-T+x.xs  [AuthClient] INFO: Sent AUTH_RESPONSE
-T+x.xs  [AuthClient] INFO: ✅ Authenticated! Session expires in ...s
-T+x.xs  [MAIN] INFO: ✅ Successfully authenticated
-T+x.xs  [Forwarder] INFO: Connecting to Pixhawk via ...
-T+x.xs  [Forwarder] INFO: Forwarder started. Target: (...)
-T+x.xs  [MAIN] INFO: UAVLink-Edge running. Press Ctrl+C to stop.
+./run.sh → main.py
+    │
+    ▼
+┌─────────────────────┐
+│ instance_lock       │
+│ Config + AuthClient │
+│ VPNManager          │
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ start_server :8080  │
+│ start_network_monitor│
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ wait_for_cloud_egress│  ← 5–10s nếu không có 4G; bỏ qua netmon user-run
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ auth.start()        │  TCP :5770 → session token
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ VPN provision/start │
+│ fwd.rebind_vpn_socket│
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ ensure_ethernet_ready│  ip addr trên eth0 (auto_setup)
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ fwd.start()         │
+│  udpin:local_ip:14550│
+│  prefer_ethernet +   │
+│  serial backup       │
+│  partner HB 1 Hz     │
+└──────────┬──────────┘
+           ▼
+     ✅ OPERATIONAL
 ```
 
 ---
 
-## Configuration & Behavior Notes
+## Threads khi OPERATIONAL
 
-* Mọi cấu hình được đọc từ file `config.yaml` thông qua parser trong `config.py`.
-* **Chế độ mạng**: Hệ thống hiện tại được kiến trúc thuần túy chạy trên WiFi-only theo yêu cầu refactor. Các bước PBR routing phức tạp và module quản lý 4G không tải trong code gốc (Python).
-* **Kết nối Server**: Drone sử dụng TCP để xác thực (`AuthClient`) và lấy session token, sau đó dùng IP/Port (Target Host) và token đó cho mọi gói MAVLink UDP (góp phần giảm latency). Các UDP heartbeat tự động giữ kết nối cho endpoint của Drone với Router Backend.
+| Thread | Module | Mô tả |
+|--------|--------|--------|
+| `MainThread` | `main.py` | Giữ process, SIGINT/SIGTERM |
+| Flask | `web/server.py` | HTTP API + static UI |
+| `keepalive_loop` | `auth_client.py` | SESSION_REFRESH / re-auth |
+| `uplink_loop` (×N) | `forwarder.py` | MAVLink từ Pixhawk → server UDP |
+| `downlink_loop` | `forwarder.py` | Server → Pixhawk |
+| `partner-heartbeat` | `forwarder.py` | HEARTBEAT 1 Hz → Pixhawk (chung socket UDP) |
+| `connection_manager` | `Module_4G/` | Netmon JSON (optional, sudo) |
+
+---
+
+## Đăng ký (`--register`)
+
+```bash
+./run.sh --register
+```
+
+Gửi `REGISTER_INIT` / `REGISTER_RESPONSE`, lưu `.drone_secret`, **không** start forwarder.
+
+---
+
+## Log timeline — khởi động thành công
+
+```text
+[MAIN] Starting UAVLink-Edge (Python Version) on Pi 5
+[VPN] Tunnel ready — assigned 10.8.x.x
+[WebServer] Starting web server on http://0.0.0.0:8080
+[CloudEgress] No 4G modem — WiFi available, skip long cloud_ready wait
+[AuthClient] ✅ Authenticated!
+[EthernetSetup] Ethernet eth0 already has 10.41.10.10
+[Forwarder] Pixhawk UDP listener udpin:10.41.10.10:14550
+[Forwarder] Forwarder started. Target: ('10.8.0.1', 14550)
+[MAIN] UAVLink-Edge running. Press Ctrl+C to stop.
+```
+
+---
+
+## Camera overlay (tách khỏi main loop)
+
+Nút **Reboot CM5** trên web gọi `POST /api/camera/apply-overlay` → `apply_camera_overlay.sh` (cần `install_camera_sudoers.sh` một lần trên Pi).
+
+Không chạy trong `./run.sh` — chỉ khi user lưu sensor và reboot từ UI.
+
+---
+
+## Ghi chú
+
+- Cấu hình: `config.yaml` qua `config.py`.
+- **Ethernet:** `ethernet.auto_setup: true` gán IP trước bind MAVLink; lỗi `Cannot assign requested address` = thiếu bước này.
+- **MAVLink 0 msg/s:** thường do 2 instance cùng bind `:14550` — chỉ chạy một `./run.sh`.
+- **4G:** `Module_4G` tùy chọn; WiFi-only vẫn auth và forward MAVLink qua VPN.
+
+Xem thêm: [README.md](README.md), [AUTHENTICATION_PROTOCOL.md](AUTHENTICATION_PROTOCOL.md).

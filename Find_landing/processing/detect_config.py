@@ -23,3 +23,29 @@ def frame_skip(config: dict, key: str = "detect_frame_skip", default: int = 3) -
         return max(int(config.get(key, default)), 1)
     except (TypeError, ValueError):
         return default
+
+
+def lost_hold_ms(config: dict | None, default: int = 1500) -> int:
+    """Thời gian giữ pose sau lần nhìn thấy marker cuối (ms), độc lập detect_frame_skip."""
+    if not config:
+        return default
+    try:
+        v = config.get("detection_lost_hold_ms")
+        if v is not None:
+            return max(int(v), 0)
+    except (TypeError, ValueError):
+        pass
+    return default
+
+
+def reacquire_ms(config: dict | None, default: int = 2500) -> int:
+    """Sau khi mất target, detect mỗi frame trong cửa sổ này để bắt lại nhanh."""
+    if not config:
+        return default
+    try:
+        v = config.get("detection_reacquire_ms")
+        if v is not None:
+            return max(int(v), 0)
+    except (TypeError, ValueError):
+        pass
+    return default

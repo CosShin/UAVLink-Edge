@@ -60,8 +60,6 @@ class ProcessingPipeline:
         self._latest: Optional[ProcessResult] = None
         self._latest_detection: dict = {"detected": False}
         self._detections_count = 0
-        self._display_miss = 0
-        self._display_hold = max(int(config.get("overlay_hold_frames", 18)), 4)
         self._worker: Optional[Thread] = None
 
     @property
@@ -189,11 +187,4 @@ class ProcessingPipeline:
 
             with self._lock:
                 self._latest = result
-                if detection.get("detected"):
-                    self._latest_detection = dict(detection)
-                    self._display_miss = 0
-                elif self._latest_detection.get("detected") and self._display_miss < self._display_hold:
-                    self._display_miss += 1
-                else:
-                    self._latest_detection = dict(detection)
-                    self._display_miss += 1
+                self._latest_detection = dict(detection)

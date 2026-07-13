@@ -1207,7 +1207,10 @@ Loading GPS information...
                         <label class="form-label" style="margin-top:0.5rem">Gate timeout (ms, 0 = latest)</label>
                         <input type="number" class="form-input cam-form-input" id="cam0-gate-timeout" min="0" max="500" value="0" step="1">
                         <label class="form-label" style="margin-top:0.5rem">Detect every N frames</label>
-                        <input type="number" class="form-input cam-form-input" id="cam0-detect-skip" min="1" max="120" value="30" step="1">
+                        <input type="number" class="form-input cam-form-input" id="cam0-detect-skip" min="1" max="120" value="3" step="1">
+                        <label class="form-label" style="margin-top:0.5rem">Lost hold (ms)</label>
+                        <input type="number" class="form-input cam-form-input" id="cam0-lost-hold" min="0" max="10000" value="1500" step="100">
+                        <p class="form-hint" style="margin-top:0.25rem;font-size:0.8rem;color:var(--text-muted)">Giữ overlay sau lần thấy marker cuối; 0 = mất ngay. Không phụ thuộc detect skip.</p>
                         <label class="form-label" style="margin-top:0.5rem">Overlay every N frames</label>
                         <input type="number" class="form-input cam-form-input" id="cam0-overlay-skip" min="1" max="60" value="5" step="1">
                         <label class="form-label" style="margin-top:0.5rem">Lores size (CV)</label>
@@ -1277,7 +1280,10 @@ Loading GPS information...
                         <label class="form-label" style="margin-top:0.5rem">Gate timeout (ms, 0 = latest)</label>
                         <input type="number" class="form-input cam-form-input" id="cam1-gate-timeout" min="0" max="500" value="0" step="1">
                         <label class="form-label" style="margin-top:0.5rem">Detect every N frames</label>
-                        <input type="number" class="form-input cam-form-input" id="cam1-detect-skip" min="1" max="120" value="30" step="1">
+                        <input type="number" class="form-input cam-form-input" id="cam1-detect-skip" min="1" max="120" value="3" step="1">
+                        <label class="form-label" style="margin-top:0.5rem">Lost hold (ms)</label>
+                        <input type="number" class="form-input cam-form-input" id="cam1-lost-hold" min="0" max="10000" value="1500" step="100">
+                        <p class="form-hint" style="margin-top:0.25rem;font-size:0.8rem;color:var(--text-muted)">Giữ overlay sau lần thấy marker cuối; 0 = mất ngay.</p>
                         <label class="form-label" style="margin-top:0.5rem">Overlay every N frames</label>
                         <input type="number" class="form-input cam-form-input" id="cam1-overlay-skip" min="1" max="60" value="5" step="1">
                         <label class="form-label" style="margin-top:0.5rem">Lores size (CV)</label>
@@ -1531,8 +1537,35 @@ Loading GPS information...
             const enabled = isCamEnabledToggle(port);
             const badge = document.getElementById(port + '-live-badge');
             if (!badge) return;
-            badge.textContent = enabled ? 'Live' : 'Off';
-            badge.className = 'cam-pill ' + (enabled ? 'live' : 'off');
+            if (!enabled) {
+                badge.textContent = 'Off';
+                badge.className = 'cam-pill off';
+                return;
+            }
+            badge.textContent = 'Enabled';
+            badge.className = 'cam-pill';
+        }
+
+        function refreshCameraStreamBadges() {
+            return fetch('/api/camera/status')
+                .then(r => r.json())
+                .then(data => {
+                    const running = new Set((data.streams || [])
+                        .filter(s => s.running)
+                        .map(s => s.camera_id));
+                    ['cam0', 'cam1'].forEach((port, idx) => {
+                        const badge = document.getElementById(port + '-live-badge');
+                        if (!badge || !isCamEnabledToggle(port)) return;
+                        if (running.has(idx)) {
+                            badge.textContent = 'Streaming';
+                            badge.className = 'cam-pill live';
+                        } else {
+                            badge.textContent = 'No stream';
+                            badge.className = 'cam-pill off';
+                        }
+                    });
+                })
+                .catch(() => {});
         }
 
         function populateLandingModeSelects() {
@@ -1626,11 +1659,13 @@ Loading GPS information...
                     if (burnEl) burnEl.checked = config.overlay_burn_enabled !== false;
                     const gateEl = document.getElementById(port + '-gate-timeout');
                     const detSkipEl = document.getElementById(port + '-detect-skip');
+                    const lostHoldEl = document.getElementById(port + '-lost-hold');
                     const ovlSkipEl = document.getElementById(port + '-overlay-skip');
                     const loresEl = document.getElementById(port + '-lores-size');
                     const modeEl = document.getElementById(port + '-landing-mode');
                     if (gateEl) gateEl.value = config.gate_timeout_ms ?? 0;
-                    if (detSkipEl) detSkipEl.value = config.detect_frame_skip ?? 30;
+                    if (detSkipEl) detSkipEl.value = config.detect_frame_skip ?? 3;
+                    if (lostHoldEl) lostHoldEl.value = config.detection_lost_hold_ms ?? 1500;
                     if (ovlSkipEl) ovlSkipEl.value = config.overlay_frame_skip ?? 5;
                     if (modeEl) modeEl.value = landingModeFromConfig(config);
                     if (loresEl) {
@@ -1727,6 +1762,7 @@ Loading GPS information...
                             ? '✓ Streams restarted.\nPIDs: ' + JSON.stringify(d.pids || [])
                             : '✗ Restart failed: ' + (d.message || 'unknown');
                     }
+                    refreshCameraStreamBadges();
                     return d;
                 })
                 .catch(e => {
@@ -1743,7 +1779,11 @@ Loading GPS information...
             }
             const output = document.getElementById('cameraSetupOutput');
             if (output) output.textContent = 'Applying overlay and rebooting CM5...\n';
-            return fetch('/api/camera/apply-overlay', { method: 'POST' })
+            return fetch('/api/camera/apply-overlay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force: true })
+            })
                 .then(r => r.json())
                 .then(d => {
                     if (output) {
@@ -1814,6 +1854,7 @@ Loading GPS information...
             const burnEl = document.getElementById(port + '-overlay-burn');
             const gateEl = document.getElementById(port + '-gate-timeout');
             const detSkipEl = document.getElementById(port + '-detect-skip');
+            const lostHoldEl = document.getElementById(port + '-lost-hold');
             const ovlSkipEl = document.getElementById(port + '-overlay-skip');
             const loresEl = document.getElementById(port + '-lores-size');
             const modeEl = document.getElementById(port + '-landing-mode');
@@ -1833,7 +1874,8 @@ Loading GPS information...
                 overlay_enabled: ovlEl ? ovlEl.checked : true,
                 overlay_burn_enabled: burnEl ? burnEl.checked : true,
                 gate_timeout_ms: gateEl ? parseInt(gateEl.value, 10) || 0 : 0,
-                detect_frame_skip: detSkipEl ? parseInt(detSkipEl.value, 10) || 30 : 30,
+                detect_frame_skip: detSkipEl ? parseInt(detSkipEl.value, 10) || 3 : 3,
+                detection_lost_hold_ms: lostHoldEl ? parseInt(lostHoldEl.value, 10) || 0 : 1500,
                 overlay_frame_skip: ovlSkipEl ? parseInt(ovlSkipEl.value, 10) || 5 : 5,
                 lores_size: [loresW, loresH],
                 landing_detection_mode: landing.landing_detection_mode,
@@ -2645,7 +2687,9 @@ Loading GPS information...
             populateLandingModeSelects();
             refreshNetworkStatus();
             refreshCameraDetect(false);
+            refreshCameraStreamBadges();
             setInterval(refreshNetworkStatus, 10000);
+            setInterval(refreshCameraStreamBadges, 5000);
         });
 
         // Stop interval when modal closes

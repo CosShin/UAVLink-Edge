@@ -131,7 +131,15 @@ class Forwarder:
 
         spec = self._ethernet_udpin_spec()
         logger.info("[MAVLINK] Pixhawk UDP listener %s (fixed port for ETH partner)", spec)
-        return mavutil.mavlink_connection(spec)
+        try:
+            return mavutil.mavlink_connection(spec)
+        except OSError as exc:
+            local_ip = str(self.ethernet.get("local_ip") or "").strip()
+            if not local_ip:
+                raise
+            fallback = f"udpin:0.0.0.0:{self._listen_port()}"
+            logger.warning("[MAVLINK] bind %s failed (%s) — retry %s", spec, exc, fallback)
+            return mavutil.mavlink_connection(fallback)
 
     def start_listener(self) -> bool:
         paths = []
@@ -146,9 +154,13 @@ class Forwarder:
             try:
                 self._connections[path] = self._create_connection(path)
             except Exception as exc:
-                if path == MAVLINK_PATH_SERIAL and self.connection_type == "prefer_ethernet":
-                    logger.warning("[MAVLINK] Serial backup disabled: %s", exc)
-                    continue
+                if self.connection_type == "prefer_ethernet":
+                    if path == MAVLINK_PATH_ETHERNET:
+                        logger.warning("[MAVLINK] Ethernet listener failed, trying serial backup: %s", exc)
+                        continue
+                    if path == MAVLINK_PATH_SERIAL:
+                        logger.warning("[MAVLINK] Serial backup disabled: %s", exc)
+                        continue
                 logger.error("[MAVLINK] Failed to open %s listener: %s", path, exc)
                 return False
 
@@ -162,6 +174,9 @@ class Forwarder:
         if not self.vpn_manager or not self.vpn_manager.is_enabled():
             return True
         return self.vpn_manager.is_running() and bool(self.vpn_manager.get_assigned_ip())
+
+    def is_pixhawk_connected(self) -> bool:
+        return self._pixhawk_connected.is_set()
 
     def _create_server_socket(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -431,6 +446,7 @@ class Forwarder:
         sent = 0
         first = False
         last_log = time.time()
+        last_warn = 0.0
         logger.info("[PARTNER_HB] HEARTBEAT 1 Hz via %s → %s:%d", sock.getsockname(), pixhawk_ip, pixhawk_port)
         while self.running:
             try:
@@ -450,7 +466,10 @@ class Forwarder:
                     logger.info("[PARTNER_HB] active → %s:%d (sent %d)", pixhawk_ip, pixhawk_port, sent)
                     last_log = time.time()
             except OSError as exc:
-                logger.error("[PARTNER_HB] send failed: %s", exc)
+                now = time.time()
+                if sent == 0 or now - last_warn >= 30:
+                    logger.warning("[PARTNER_HB] send failed: %s", exc)
+                    last_warn = now
             time.sleep(1)
 
     def _gps_diagnosis(self) -> tuple:

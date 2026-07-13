@@ -67,7 +67,7 @@ def start_landing_mavlink_bridge(cfg, forwarder, stop_event: Optional[threading.
     def _loop() -> None:
         while stop_event is None or not stop_event.is_set():
             lt = read_landing_telemetry(camera_id, 2.0)
-            if lt and lt.get("detected"):
+            if lt and lt.get("detected") and not lt.get("hold"):
                 msg = _landing_target_from_telemetry(lt)
                 _publish_generated(forwarder, msg)
             time.sleep(interval)

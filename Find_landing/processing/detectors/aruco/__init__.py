@@ -12,7 +12,7 @@ def prepare(find_landing_dir: str):
 
 
 def create_processor(config: dict, find_landing_dir: str, prepared=None):
-    from processing.detect_config import detect_size_from_config, frame_skip
+    from processing.detect_config import detect_size_from_config, frame_skip, lost_hold_ms, reacquire_ms
 
     from .processor import ArucoProcessor
 
@@ -23,6 +23,8 @@ def create_processor(config: dict, find_landing_dir: str, prepared=None):
         marker_id=int(config.get("aruco_marker_id", 0) or 0),
         dictionary=str(config.get("aruco_dictionary", "DICT_4X4_50")),
         detect_size=detect_size_from_config(config),
+        lost_hold_ms=lost_hold_ms(config),
+        reacquire_ms=reacquire_ms(config),
     )
 
 

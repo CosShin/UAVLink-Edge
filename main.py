@@ -46,6 +46,8 @@ from metrics import global_metrics
 from network_controller import start_network_monitor
 from vpn_manager import VPNManager
 from cloud_egress import wait_for_cloud_egress
+from ethernet_setup import ensure_ethernet_ready
+from instance_lock import acquire_instance_lock
 from camera_mavlink import start_camera_mavlink_bridge
 from landing_mavlink import start_landing_mavlink_bridge
 
@@ -78,6 +80,9 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+    if not args.register:
+        acquire_instance_lock()
 
     logger.info("Starting UAVLink-Edge (Python Version) on Pi 5")
     global_metrics.add_log("INFO", "UAVLink-Edge Python starting")
@@ -137,6 +142,18 @@ def main():
     start_server(cfg.web.get("port", 8080), fwd.stats, auth, forwarder=fwd, cfg=cfg)
     start_network_monitor()
 
+    # Eth + MAVLink trước cloud auth — Pixhawk/GCS local không chờ VPN.
+    if not ensure_ethernet_ready(cfg):
+        logger.warning("[STARTUP] Ethernet not ready — forwarder will retry serial if configured")
+
+    if not fwd.start():
+        logger.fatal("Failed to start forwarder")
+        sys.exit(1)
+
+    start_camera_mavlink_bridge(cfg, fwd, _stop_event)
+    start_landing_mavlink_bridge(cfg, fwd, _stop_event)
+    logger.info("[STARTUP] MAVLink forwarder active (cloud auth/VPN may still be initializing)")
+
     iface, ip, ready = wait_for_cloud_egress(120.0)
     if ready:
         logger.info("[STARTUP] Cloud egress ready: %s (%s)", iface, ip)
@@ -171,13 +188,6 @@ def main():
                 logger.info("[VPN] Router %s reachable", vpn_manager.router_vpn_ip)
             else:
                 logger.warning("[VPN] Cannot ping router %s", vpn_manager.router_vpn_ip)
-
-    if not fwd.start():
-        logger.fatal("Failed to start forwarder")
-        sys.exit(1)
-
-    start_camera_mavlink_bridge(cfg, fwd, _stop_event)
-    start_landing_mavlink_bridge(cfg, fwd, _stop_event)
 
     if cfg.camera.get("enabled") and cfg.camera.get("auto_start"):
         try:

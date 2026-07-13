@@ -24,7 +24,7 @@ flask
 requests
 psutil
 
-# Camera / landing (Find_landing: camera_streamer, find.py, camera_probe)
+# Camera / landing (Find_landing: camera_streamer — picamera2 via apt python3-picamera2)
 numpy
 opencv-python-headless
-picamera2
+# picamera2: cài qua apt (python3-picamera2), streamer dùng /usr/bin/python3 nếu venv thiếu

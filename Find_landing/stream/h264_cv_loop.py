@@ -192,8 +192,6 @@ def run_h264_stream_loop(streamer) -> bool:
     slow_callbacks = {"n": 0}
     det_cache = {"data": {"detected": False}}
     det_lock = Lock()
-    burn_hold_frames = max(int(config.get("overlay_hold_frames", 18)), 4)
-    burn_lock = {"det": {"detected": False}, "miss": 0}
 
     fps = int(config.get("framerate", 30))
     bitrate_kbps = int(config.get("bitrate", 5000))
@@ -233,18 +231,7 @@ def run_h264_stream_loop(streamer) -> bool:
             return dict(det_cache["data"])
 
     def _resolve_burn_detection() -> dict:
-        fresh = _current_detection()
-        if fresh.get("detected"):
-            burn_lock["miss"] = 0
-            burn_lock["det"] = dict(fresh)
-            return burn_lock["det"]
-        if burn_lock["det"].get("detected") and burn_lock["miss"] < burn_hold_frames:
-            burn_lock["miss"] += 1
-            return burn_lock["det"]
-        burn_lock["miss"] += 1
-        if burn_lock["miss"] >= burn_hold_frames:
-            burn_lock["det"] = {"detected": False}
-        return burn_lock["det"]
+        return _current_detection()
 
     def _try_burn_overlay(buf, fid: int) -> None:
         if not overlay_on or not overlay_burn:
@@ -295,8 +282,9 @@ def run_h264_stream_loop(streamer) -> bool:
         f" Hướng 1 (stream): main {config['size']} @ {fps}fps | HW H264 → FFmpeg → RTSP | "
         f"role={role} | wire={wire} swap={swap_note} | buffer={_buffer_count(config)}"
     )
+    lost_ms = int(config.get("detection_lost_hold_ms", 1500) or 1500)
     print(
-        f" Hướng 2 (CV): {h2_note} | burn realtime + hold ngắn {burn_hold_frames}f khi mất det | "
+        f" Hướng 2 (CV): {h2_note} | burn realtime | lost-hold {lost_ms}ms (wall-clock) | "
         f"RAM {memory_tier}GB"
     )
 

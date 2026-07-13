@@ -36,8 +36,11 @@ def draw(frame, detection_result: dict):
     label = f"ARUCO v2 ID={aid}"
     if n > 1:
         label += f" ({n} visible: {ids})"
+    if detection_result.get("hold"):
+        label += " [HOLD]"
 
-    put_text_line(frame, 0, label, (0, 255, 0), FONT_SCALE_LABEL)
+    color = (0, 180, 0) if detection_result.get("hold") else (0, 255, 0)
+    put_text_line(frame, 0, label, color, FONT_SCALE_LABEL)
     h_x, h_y = detection_result["h_position"]
     cv2.circle(frame, (h_x, h_y), TARGET_DOT_R, (0, 0, 255), -1, lineType=cv2.LINE_AA)
     return frame

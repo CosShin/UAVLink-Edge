@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import time
 from typing import Any
 
 
@@ -78,20 +79,22 @@ def _direction_hysteresis(
 class SmoothTracker:
     """
     EMA nhẹ — giảm rung pixel, không đóng băng pose.
-    Hold ngắn chỉ khi mất detection vài frame (chống nháy SEARCHING).
+    Giữ pose ngắn theo thời gian wall-clock (lost_hold_ms), không phụ thuộc detect_frame_skip.
     """
 
     def __init__(
         self,
         *,
         ema_alpha: float = 0.28,
-        hold_frames: int = 18,
+        lost_hold_ms: int = 1500,
         max_jump_frac: float = 0.14,
         direction_threshold: int = 20,
         direction_hysteresis: int = 15,
+        # Legacy — bỏ qua; giữ tham số để không vỡ call site cũ.
+        hold_frames: int | None = None,
     ):
         self.ema_alpha = ema_alpha
-        self.hold_frames = max(int(hold_frames), 1)
+        self.lost_hold_ms = max(int(lost_hold_ms), 0)
         self.max_jump_frac = max_jump_frac
         self.direction_threshold = direction_threshold
         self.direction_hysteresis = direction_hysteresis
@@ -102,24 +105,40 @@ class SmoothTracker:
         self._corners_f: list[tuple[float, float]] | None = None
         self._markers_by_id_f: dict[int, list[tuple[float, float]]] = {}
         self._direction = "CENTER"
-        self._miss_streak = 0
+        self._last_confirmed_at: float | None = None
 
     def accept(self, raw: dict, output_size: tuple[int, int]) -> dict | None:
         out_w, out_h = output_size
         center_x, center_y = out_w // 2, out_h // 2
+        now = time.monotonic()
 
         if not raw.get("detected"):
-            self._miss_streak += 1
-            if self._smooth is not None and self._miss_streak <= self.hold_frames:
-                held = copy.deepcopy(self._smooth)
-                held["detected"] = True
-                held["hold"] = True
-                return held
-            if self._miss_streak > self.hold_frames:
-                self._reset()
-            return {"detected": False}
+            if (
+                self._smooth is not None
+                and self._last_confirmed_at is not None
+                and self.lost_hold_ms > 0
+            ):
+                age_ms = (now - self._last_confirmed_at) * 1000.0
+                if age_ms <= self.lost_hold_ms:
+                    held = copy.deepcopy(self._smooth)
+                    held["detected"] = True
+                    held["hold"] = True
+                    held["hold_age_ms"] = int(age_ms)
+                    # Hold chỉ giữ tâm target — không ghost toàn bộ marker trên bảng.
+                    held.pop("aruco_markers_by_id", None)
+                    held.pop("aruco_markers", None)
+                    held["aruco_marker_count"] = 1
+                    return held
+            self._reset()
+            out: dict[str, Any] = {"detected": False}
+            if raw.get("aruco_visible_ids"):
+                out["aruco_visible_ids"] = raw["aruco_visible_ids"]
+                out["aruco_marker_count"] = raw.get("aruco_marker_count", len(raw["aruco_visible_ids"]))
+            if raw.get("searching_id") is not None:
+                out["searching_id"] = raw["searching_id"]
+            return out
 
-        self._miss_streak = 0
+        self._last_confirmed_at = now
         hx, hy = raw["h_position"]
         new_pos = (float(hx), float(hy))
 
@@ -163,6 +182,8 @@ class SmoothTracker:
 
         result = copy.deepcopy(raw)
         result["detected"] = True
+        result["hold"] = False
+        result["hold_age_ms"] = 0
         result["h_position"] = (sx, sy)
         result["h_size"] = (max(1, sw), max(1, sh))
         result["offset_x"] = off_x
@@ -187,4 +208,4 @@ class SmoothTracker:
         self._corners_f = None
         self._markers_by_id_f = {}
         self._direction = "CENTER"
-        self._miss_streak = 0
+        self._last_confirmed_at = None

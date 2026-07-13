@@ -50,7 +50,15 @@ def draw_overlay(frame, detection_result, overlay_enabled: bool = True, *, coord
         return frame
 
     if not detection_result.get("detected", False):
-        put_text_line(frame, 0, "SEARCHING...", (0, 255, 255), FONT_SCALE_LABEL)
+        searching = detection_result.get("searching_id")
+        visible = detection_result.get("aruco_visible_ids")
+        if searching is not None:
+            msg = f"SEARCHING ArUco ID={searching}"
+            if visible:
+                msg += f" (visible: {visible})"
+            put_text_line(frame, 0, msg, (0, 255, 255), FONT_SCALE_LABEL)
+        else:
+            put_text_line(frame, 0, "SEARCHING...", (0, 255, 255), FONT_SCALE_LABEL)
         return frame
 
     fh, fw = frame.shape[:2]

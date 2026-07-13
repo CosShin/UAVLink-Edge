@@ -100,7 +100,10 @@ def _build_metrics_snapshot() -> dict:
     snapshot = global_metrics.get_snapshot()
     telem = global_telemetry.snapshot()
     snapshot["telemetry_valid"] = telem.get("valid", False)
-    snapshot["pixhawk_connected"] = telem.get("connected", False)
+    px4_link = telem.get("connected", False) or bridge.is_connected()
+    if _fwd_ref and hasattr(_fwd_ref, "is_pixhawk_connected"):
+        px4_link = px4_link or _fwd_ref.is_pixhawk_connected()
+    snapshot["pixhawk_connected"] = px4_link
     snapshot["telemetry"] = telem
     if _fwd_ref and hasattr(_fwd_ref, "stats_lock"):
         with _fwd_ref.stats_lock:
@@ -681,18 +684,28 @@ def api_camera_landing():
 def api_camera_apply_overlay():
     from web.camera_service import apply_camera_overlay_host
 
-    output, err = apply_camera_overlay_host()
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force") or body.get("force_reboot"))
+    output, err = apply_camera_overlay_host(force_reboot=force)
     if err:
         return {
             "success": False,
-            "message": "Không thể áp dụng overlay/reboot. Chạy: sudo bash setup_camera.sh",
+            "message": "Không thể áp dụng overlay/reboot. Chạy: sudo bash install_camera_sudoers.sh",
             "error": str(err),
             "output": output,
         }, 500
+    reboot_scheduled = "apply_host_reboot.sh" in output or "Tự reboot" in output
+    if force and not reboot_scheduled:
+        reboot_scheduled = "user requested reboot" in output
+    if reboot_scheduled:
+        message = "Đã áp dụng overlay — Pi reboot trong ~2s"
+    else:
+        message = "Boot overlay đã đúng — không cần reboot (đã lưu sensor trong config)"
     return {
         "success": True,
-        "message": "Đã áp dụng boot overlay — reboot trong ~2s nếu config đổi",
+        "message": message,
         "output": output,
+        "reboot_scheduled": reboot_scheduled,
     }
 
 

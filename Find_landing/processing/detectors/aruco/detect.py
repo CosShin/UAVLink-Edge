@@ -74,7 +74,11 @@ def detect_frame(
     board_markers = _board_markers(corners, ids)
     landing = _pick_landing(board_markers, marker_id)
     if landing is None:
-        return {"detected": False}
+        out: dict = {"detected": False, "searching_id": int(marker_id)}
+        if board_markers:
+            out["aruco_visible_ids"] = [m["id"] for m in board_markers]
+            out["aruco_marker_count"] = len(board_markers)
+        return out
 
     cx, cy = landing["center"]
     pts = landing["corners"]

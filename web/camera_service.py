@@ -49,6 +49,30 @@ def _stream_config_path(camera_id: int) -> Path:
     return _find_landing() / f"camera_config_{camera_id}.json"
 
 
+def _streamer_python() -> str:
+    """Picamera2 on Pi is apt-only — always prefer system python3 (Pi_CM5 behaviour)."""
+    candidates: List[str] = []
+    for exe in ("/usr/bin/python3", "python3", sys.executable):
+        if exe and exe not in candidates:
+            candidates.append(exe)
+    for exe in candidates:
+        try:
+            probe = subprocess.run(
+                [exe, "-c", "import picamera2"],
+                capture_output=True,
+                timeout=20,
+            )
+            if probe.returncode == 0:
+                logger.info("[CAMERA] Streamer interpreter: %s", exe)
+                return exe
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+    logger.warning(
+        "[CAMERA] picamera2 không có — stream sẽ lỗi. Chạy: sudo apt install -y python3-picamera2"
+    )
+    return "/usr/bin/python3" if Path("/usr/bin/python3").is_file() else sys.executable
+
+
 def _default_detected() -> dict:
     return {
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -323,6 +347,64 @@ def _find_stream(cfg, camera_id: int) -> tuple:
     return -1, default
 
 
+def _cv_lores_size(stream: dict) -> List[int]:
+    lores = stream.get("lores_size")
+    if isinstance(lores, (list, tuple)) and len(lores) >= 2:
+        return [int(lores[0]), int(lores[1])]
+    size = stream.get("size") or [640, 480]
+    w, h = int(size[0]), int(size[1])
+    if w * h <= 320 * 240:
+        return [w, h]
+    scale = min(320 / max(w, 1), 240 / max(h, 1))
+    return [max(1, int(w * scale)), max(1, int(h * scale))]
+
+
+def _streamer_json_payload(
+    stream: dict,
+    m: dict,
+    drone_id: str,
+    cam_id: int,
+    pub: str,
+    *,
+    multi_camera: bool = False,
+) -> dict:
+    size = stream.get("size") or [640, 480]
+    return {
+        "camera_id": cam_id,
+        "size": size,
+        "framerate": int(stream.get("framerate", 30)),
+        "format": stream.get("format", "BGR888"),
+        "mediamtx_host": m["host"],
+        "mediamtx_port": m["rtsp_port"],
+        "mediamtx_webrtc_port": m["webrtc_port"],
+        "mediamtx_hls_port": m["hls_port"],
+        "publish_path": pub,
+        "drone_id": drone_id,
+        "bitrate": int(stream.get("bitrate", 5000)),
+        "overlay_enabled": bool(stream.get("overlay_enabled", cam_id == 0)),
+        "overlay_burn_enabled": bool(stream.get("overlay_burn_enabled", stream.get("overlay_enabled", cam_id == 0))),
+        "detection_enabled": bool(stream.get("detection_enabled", cam_id == 0)),
+        "gate_timeout_ms": int(stream.get("gate_timeout_ms", 0) or 0),
+        "detect_frame_skip": int(stream.get("detect_frame_skip", 3) or 3),
+        "overlay_frame_skip": int(stream.get("overlay_frame_skip", 5) or 5),
+        "detection_lost_hold_ms": int(stream.get("detection_lost_hold_ms", 1500) or 1500),
+        "detection_reacquire_ms": int(stream.get("detection_reacquire_ms", 2500) or 2500),
+        "landing_detection_mode": str(stream.get("landing_detection_mode") or "contour_h"),
+        "aruco_marker_id": int(stream.get("aruco_marker_id", 0) or 0),
+        "aruco_dictionary": str(stream.get("aruco_dictionary") or "DICT_4X4_50"),
+        "lores_size": _cv_lores_size(stream),
+        "multi_camera": multi_camera,
+        "keyframe_interval": int(stream.get("keyframe_interval", 30)),
+        "preset": stream.get("preset", "ultrafast"),
+        "tune": stream.get("tune", "zerolatency"),
+        "brightness": float(stream.get("brightness", 0)),
+        "contrast": float(stream.get("contrast", 1)),
+        "sharpness": float(stream.get("sharpness", 1.5)),
+        "saturation": float(stream.get("saturation", 1.0)),
+        "exposure_time": int(stream.get("exposure_time", 0)),
+    }
+
+
 def camera_config_to_ui(cfg, camera_id: int) -> dict:
     _, stream = _find_stream(cfg, camera_id)
     m = _mediamtx(cfg)
@@ -343,12 +425,24 @@ def camera_config_to_ui(cfg, camera_id: int) -> dict:
         "drone_id": cfg.auth.get("uuid", "") if isinstance(cfg.auth, dict) else "",
         "bitrate": int(stream.get("bitrate", 5000)),
         "overlay_enabled": bool(stream.get("overlay_enabled", camera_id == 0)),
+        "overlay_burn_enabled": bool(stream.get("overlay_burn_enabled", stream.get("overlay_enabled", camera_id == 0))),
         "detection_enabled": bool(stream.get("detection_enabled", camera_id == 0)),
+        "gate_timeout_ms": int(stream.get("gate_timeout_ms", 0) or 0),
+        "detect_frame_skip": int(stream.get("detect_frame_skip", 3) or 3),
+        "overlay_frame_skip": int(stream.get("overlay_frame_skip", 5) or 5),
+        "detection_lost_hold_ms": int(stream.get("detection_lost_hold_ms", 1500) or 1500),
+        "detection_reacquire_ms": int(stream.get("detection_reacquire_ms", 2500) or 2500),
+        "landing_detection_mode": str(stream.get("landing_detection_mode") or "contour_h"),
+        "aruco_marker_id": int(stream.get("aruco_marker_id", 0) or 0),
+        "aruco_dictionary": str(stream.get("aruco_dictionary") or "DICT_4X4_50"),
+        "lores_size": _cv_lores_size(stream),
         "keyframe_interval": int(stream.get("keyframe_interval", 30)),
         "preset": stream.get("preset", "ultrafast"),
         "tune": stream.get("tune", "zerolatency"),
         "brightness": float(stream.get("brightness", 0)),
         "contrast": float(stream.get("contrast", 1)),
+        "sharpness": float(stream.get("sharpness", 1.5)),
+        "saturation": float(stream.get("saturation", 1.0)),
         "exposure_time": int(stream.get("exposure_time", 0)),
     }
 
@@ -402,33 +496,16 @@ def write_streamer_configs(cfg) -> List[str]:
     written = []
     landing = _find_landing()
     landing.mkdir(parents=True, exist_ok=True)
-    for stream in cfg.data.get("camera", {}).get("streams", []):
-        if not stream.get("enabled", True):
-            continue
+    enabled_streams = [
+        s for s in cfg.data.get("camera", {}).get("streams", []) if s.get("enabled", True)
+    ]
+    multi_camera = len(enabled_streams) > 1
+    for stream in enabled_streams:
         cam_id = int(stream.get("camera_id", 0))
         pub = publish_path(cfg, cam_id)
-        size = stream.get("size") or [640, 480]
-        payload = {
-            "camera_id": cam_id,
-            "size": size,
-            "framerate": int(stream.get("framerate", 30)),
-            "format": stream.get("format", "RGB888"),
-            "mediamtx_host": m["host"],
-            "mediamtx_port": m["rtsp_port"],
-            "mediamtx_webrtc_port": m["webrtc_port"],
-            "mediamtx_hls_port": m["hls_port"],
-            "publish_path": pub,
-            "drone_id": drone_id,
-            "bitrate": int(stream.get("bitrate", 5000)),
-            "overlay_enabled": bool(stream.get("overlay_enabled", cam_id == 0)),
-            "detection_enabled": bool(stream.get("detection_enabled", cam_id == 0)),
-            "keyframe_interval": int(stream.get("keyframe_interval", 30)),
-            "preset": stream.get("preset", "ultrafast"),
-            "tune": stream.get("tune", "zerolatency"),
-            "brightness": float(stream.get("brightness", 0)),
-            "contrast": float(stream.get("contrast", 1)),
-            "exposure_time": int(stream.get("exposure_time", 0)),
-        }
+        payload = _streamer_json_payload(
+            stream, m, drone_id, cam_id, pub, multi_camera=multi_camera
+        )
         path = _stream_config_path(cam_id)
         path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         written.append(str(path))
@@ -452,12 +529,20 @@ def save_camera_stream_from_ui(cfg, incoming: dict) -> None:
     for key in ("brightness", "contrast"):
         if key in incoming:
             stream[key] = float(incoming[key])
-    for key in ("detection_enabled", "overlay_enabled"):
+    for key in ("detection_enabled", "overlay_enabled", "overlay_burn_enabled"):
         if key in incoming:
             stream[key] = bool(incoming[key])
-    for key in ("preset", "tune"):
+    for key in ("preset", "tune", "landing_detection_mode", "aruco_dictionary"):
         if key in incoming:
             stream[key] = incoming[key]
+    for key in ("gate_timeout_ms", "detect_frame_skip", "overlay_frame_skip", "aruco_marker_id", "detection_lost_hold_ms", "detection_reacquire_ms"):
+        if key in incoming:
+            stream[key] = int(incoming[key])
+    for key in ("sharpness", "saturation"):
+        if key in incoming:
+            stream[key] = float(incoming[key])
+    if "lores_size" in incoming and isinstance(incoming["lores_size"], (list, tuple)):
+        stream["lores_size"] = [int(incoming["lores_size"][0]), int(incoming["lores_size"][1])]
 
     streams = cfg.data.setdefault("camera", {}).setdefault("streams", [])
     if idx >= 0:
@@ -515,6 +600,7 @@ def camera_restart(cfg) -> tuple:
         if not script.exists():
             return {"success": False, "message": "camera_streamer.py not found"}, 503
 
+        py = _streamer_python()
         started = []
         for i, cfg_path in enumerate(sorted(paths)):
             if i > 0:
@@ -526,12 +612,12 @@ def camera_restart(cfg) -> tuple:
             if len(paths) > 1:
                 env["DRONEBRIDGE_MULTI_CAMERA"] = "1"
             proc = subprocess.Popen(
-                [sys.executable, str(script), base],
+                [py, str(script), base],
                 cwd=str(_find_landing()),
                 env=env,
             )
             started.append({"camera_id": cam_id, "proc": proc, "config": base})
-            logger.info("[CAMERA] Streamer cam%s started (PID %s)", cam_id, proc.pid)
+            logger.info("[CAMERA] Streamer cam%s started (PID %s, %s)", cam_id, proc.pid, py)
 
         _manager_procs.extend(started)
         time.sleep(2)
@@ -702,12 +788,18 @@ def _detect_memory_tier_gb() -> int:
         return 4
 
 
-def apply_camera_overlay_host() -> tuple:
-    script = project_path("setup_camera.sh")
-    if not script.exists():
-        return "", FileNotFoundError("setup_camera.sh not found")
+def apply_camera_overlay_host(force_reboot: bool = False) -> tuple:
+    script = project_path("apply_camera_overlay.sh")
+    if not script.is_file():
+        script = project_path("setup_camera.sh")
+    if not script.is_file():
+        return "", FileNotFoundError("apply_camera_overlay.sh not found")
+    cfg = project_path("config.yaml")
+    cmd = ["sudo", "-n", "bash", str(script), str(cfg)]
+    if force_reboot and script.name == "apply_camera_overlay.sh":
+        cmd.append("--force-reboot")
     result = subprocess.run(
-        ["sudo", "-n", "bash", str(script)],
+        cmd,
         capture_output=True,
         text=True,
         timeout=120,
@@ -715,5 +807,10 @@ def apply_camera_overlay_host() -> tuple:
     )
     output = (result.stdout or "") + (result.stderr or "")
     if result.returncode != 0:
-        return output, RuntimeError(result.stderr or result.stdout or "overlay apply failed")
+        err_text = (result.stderr or result.stdout or "overlay apply failed").strip()
+        if "password is required" in err_text.lower() or "a password is required" in err_text.lower():
+            err_text += (
+                "\nChạy một lần: sudo bash install_camera_sudoers.sh"
+            )
+        return output, RuntimeError(err_text)
     return output, None

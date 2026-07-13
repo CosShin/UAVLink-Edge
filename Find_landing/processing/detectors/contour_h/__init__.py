@@ -14,7 +14,7 @@ def prepare(find_landing_dir: str):
 
 
 def create_processor(config: dict, find_landing_dir: str, prepared=None):
-    from processing.detect_config import detect_size_from_config, frame_skip
+    from processing.detect_config import detect_size_from_config, frame_skip, lost_hold_ms
 
     from .processor import ContourHProcessor
 
@@ -26,6 +26,7 @@ def create_processor(config: dict, find_landing_dir: str, prepared=None):
         threshold=float(config.get("detection_threshold", 0.8)),
         allow_fullframe_fallback=bool(config.get("landing_fullframe_fallback", True)),
         detect_size=detect_size_from_config(config),
+        lost_hold_ms=lost_hold_ms(config),
     )
 
 
