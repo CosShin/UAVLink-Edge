@@ -348,7 +348,7 @@
                             <td class="${failedUnhealthy > 0 ? 'status-err' : ''}">${failedUnhealthy}</td>
                             <td class="${failedSend > 0 ? 'status-err' : ''}">${failedSend}</td>
                             <td class="${totalFailed > 0 ? 'status-err' : ''}">${totalFailed}</td>
-                            <td class="${totalFailed > 0 ? 'status-err' : ''}">${lossRate}%</td>
+                            <td class="${failedSend > 0 ? 'status-err' : ''}">${lossRate}%</td>
                         `;
                         tbody.appendChild(row);
                     });

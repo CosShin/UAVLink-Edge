@@ -27,18 +27,33 @@ def camera_status():
 
 def camera_test():
     result, _status = svc.camera_detect(refresh=True)
-    if result.get("connected_count", 0) > 0:
+    csi_cameras = [
+        {
+            "id": c.get("libcamera_index"),
+            "info": c.get("sensor_name", c.get("sensor")),
+            "source": "csi",
+        }
+        for c in result.get("connected", [])
+    ]
+    usb_cameras = [
+        {
+            "id": c.get("id"),
+            "info": c.get("info") or c.get("device"),
+            "source": "usb",
+            "device": c.get("device"),
+        }
+        for c in result.get("usb_cameras", [])
+    ]
+    cameras = csi_cameras + usb_cameras
+    if cameras:
         return {
             "success": True,
-            "cameras": [
-                {"id": c.get("libcamera_index"), "info": c.get("sensor_name", c.get("sensor"))}
-                for c in result.get("connected", [])
-            ],
+            "cameras": cameras,
         }, 200
     return {
         "success": False,
         "message": "Không phát hiện camera",
-        "output": result.get("message") or "rpicam-hello: no cameras",
+        "output": result.get("message") or result.get("usb_message") or "Không có CSI/USB camera",
     }, 500
 
 

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <style>
+      .title { font: 700 36px Arial, sans-serif; fill: #10233f; }
+      .subtitle { font: 700 25px Arial, sans-serif; fill: #154c79; }
+      .body { font: 21px Arial, sans-serif; fill: #17202a; }
+      .small { font: 18px Arial, sans-serif; fill: #34495e; }
+      .formula { font: 700 24px Arial, sans-serif; fill: #8a2d1d; }
+      .measure { stroke: #e74c3c; stroke-width: 4; fill: none; }
+      .ray { stroke: #f39c12; stroke-width: 4; fill: none; }
+      .axis { stroke: #2471a3; stroke-width: 4; fill: none; }
+      .wall { stroke: #2c3e50; stroke-width: 10; }
+      .guide { stroke: #85929e; stroke-width: 2; stroke-dasharray: 9 8; }
+      .panel { fill: #ffffff; stroke: #b8c5d6; stroke-width: 3; }
+    </style>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e74c3c"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2471a3"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="900" fill="#eef4fa"/>
+  <text x="700" y="52" text-anchor="middle" class="title">MÔ PHỎNG ĐO GÓC NHÌN CAMERA (HFOV / VFOV)</text>
+  <text x="700" y="83" text-anchor="middle" class="small">Giữ camera vuông góc với tường và dùng đúng chế độ video 1280 × 720</text>
+
+  <!-- Horizontal panel -->
+  <rect x="35" y="110" width="650" height="540" rx="18" class="panel"/>
+  <text x="360" y="150" text-anchor="middle" class="subtitle">1. NHÌN TỪ TRÊN XUỐNG — ĐO HFOV</text>
+
+  <!-- Camera icon -->
+  <rect x="105" y="355" width="95" height="70" rx="10" fill="#34495e"/>
+  <circle cx="202" cy="390" r="24" fill="#17202a" stroke="#85c1e9" stroke-width="7"/>
+  <text x="148" y="455" text-anchor="middle" class="body">Camera</text>
+
+  <!-- Wall and visible width -->
+  <line x1="590" y1="195" x2="590" y2="585" class="wall"/>
+  <text x="620" y="390" transform="rotate(90 620 390)" text-anchor="middle" class="body">TƯỜNG PHẲNG</text>
+  <line x1="210" y1="390" x2="590" y2="235" class="ray"/>
+  <line x1="210" y1="390" x2="590" y2="545" class="ray"/>
+  <path d="M 286 359 A 82 82 0 0 1 286 421" stroke="#8e44ad" stroke-width="5" fill="none"/>
+  <text x="320" y="398" class="formula">HFOV</text>
+
+  <line x1="245" y1="480" x2="555" y2="480" class="axis" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+  <line x1="245" y1="390" x2="245" y2="500" class="guide"/>
+  <line x1="555" y1="390" x2="555" y2="500" class="guide"/>
+  <text x="400" y="515" text-anchor="middle" class="body">D = khoảng cách camera → tường</text>
+
+  <line x1="545" y1="235" x2="545" y2="545" class="measure" marker-start="url(#arrow-red)" marker-end="url(#arrow-red)"/>
+  <text x="525" y="390" transform="rotate(-90 525 390)" text-anchor="middle" class="body">W = chiều rộng nhìn thấy</text>
+
+  <rect x="75" y="555" width="535" height="70" rx="12" fill="#fff4e5" stroke="#f39c12" stroke-width="2"/>
+  <text x="342" y="600" text-anchor="middle" class="formula">HFOV = 2 × atan(W ÷ (2 × D))</text>
+
+  <!-- Vertical panel -->
+  <rect x="715" y="110" width="650" height="540" rx="18" class="panel"/>
+  <text x="1040" y="150" text-anchor="middle" class="subtitle">2. NHÌN TỪ BÊN HÔNG — ĐO VFOV</text>
+
+  <rect x="785" y="355" width="95" height="70" rx="10" fill="#34495e"/>
+  <circle cx="882" cy="390" r="24" fill="#17202a" stroke="#85c1e9" stroke-width="7"/>
+  <text x="828" y="455" text-anchor="middle" class="body">Camera</text>
+
+  <line x1="1270" y1="195" x2="1270" y2="585" class="wall"/>
+  <text x="1300" y="390" transform="rotate(90 1300 390)" text-anchor="middle" class="body">TƯỜNG PHẲNG</text>
+  <line x1="890" y1="390" x2="1270" y2="260" class="ray"/>
+  <line x1="890" y1="390" x2="1270" y2="520" class="ray"/>
+  <path d="M 968 363 A 82 82 0 0 1 968 417" stroke="#8e44ad" stroke-width="5" fill="none"/>
+  <text x="1000" y="398" class="formula">VFOV</text>
+
+  <line x1="925" y1="480" x2="1235" y2="480" class="axis" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+  <line x1="925" y1="390" x2="925" y2="500" class="guide"/>
+  <line x1="1235" y1="390" x2="1235" y2="500" class="guide"/>
+  <text x="1080" y="515" text-anchor="middle" class="body">D = khoảng cách camera → tường</text>
+
+  <line x1="1225" y1="260" x2="1225" y2="520" class="measure" marker-start="url(#arrow-red)" marker-end="url(#arrow-red)"/>
+  <text x="1205" y="390" transform="rotate(-90 1205 390)" text-anchor="middle" class="body">H = chiều cao nhìn thấy</text>
+
+  <rect x="755" y="555" width="535" height="70" rx="12" fill="#fff4e5" stroke="#f39c12" stroke-width="2"/>
+  <text x="1022" y="600" text-anchor="middle" class="formula">VFOV = 2 × atan(H ÷ (2 × D))</text>
+
+  <!-- Example -->
+  <rect x="35" y="680" width="1330" height="180" rx="18" fill="#eafaf1" stroke="#58b37b" stroke-width="3"/>
+  <text x="65" y="720" class="subtitle">VÍ DỤ GHI SỐ ĐO</text>
+  <text x="65" y="762" class="body">D = 2,00 m     W = 2,30 m     H = 1,65 m</text>
+  <text x="65" y="805" class="formula">HFOV = 2 × atan(2,30 ÷ 4,00) ≈ 59,8°</text>
+  <text x="700" y="805" class="formula">VFOV = 2 × atan(1,65 ÷ 4,00) ≈ 44,8°</text>
+  <text x="65" y="840" class="body">Nhập YAML:  camera_hfov_deg: 59.8     camera_vfov_deg: 44.8</text>
+</svg>

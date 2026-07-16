@@ -29,9 +29,12 @@ class CaptureSource:
             time.sleep(1)
 
         camera_config = {
+            "source": str(streamer.config.get("source") or "csi").lower(),
             "format": streamer.config["format"],
             "size": tuple(streamer.config["size"]),
-            "device_path": streamer.config.get("camera_device", ""),
+            "device_path": streamer.config.get("device_path") or streamer.config.get("camera_device", ""),
+            "usb_input_format": streamer.config.get("usb_input_format", "auto"),
+            "framerate": streamer.config.get("framerate", 30),
             "brightness": streamer.config.get("brightness", 0),
             "contrast": streamer.config.get("contrast", 1),
             "sharpness": streamer.config.get("sharpness", 1.5),

@@ -51,6 +51,7 @@ class CameraStreamer:
         self.rpicam_process = None
         self.gst_launch_path = self._find_gst_launch()
         self.pipe_read_fd = None
+        self._stderr_thread = None
         
         self.frames_sent = 0
         self.detections_count = 0
@@ -126,24 +127,97 @@ class CameraStreamer:
         pipe_pix = 'rgb24' if wire_pixel_format(self.config) == 'rgb' else 'bgr24'
         preset = self.config.get('preset', 'veryfast') or 'veryfast'
         tune = self.config.get('tune', 'zerolatency') or 'zerolatency'
-        bufsize_k = max(bitrate, 1500)
+        bufsize_k = max(int(bitrate * 0.5), 500)
         threads = self._x264_thread_count()
+        level = '3.1' if width * height <= 1280 * 720 and fps <= 30 else '4.0'
+        transport = str(self.config.get('rtsp_transport') or 'tcp').lower()
+        if transport not in ('tcp', 'udp'):
+            transport = 'tcp'
         return [
             ffmpeg, '-loglevel', 'warning', '-nostats',
+            '-fflags', 'nobuffer', '-flags', 'low_delay',
             '-f', 'rawvideo', '-pix_fmt', pipe_pix,
             '-s', f'{width}x{height}', '-r', str(fps),
             '-i', 'pipe:0',
             # yuv420p + baseline: MediaMTX WebRTC (see mediamtx.org/docs/features/webrtc-specific-features)
             '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-            '-profile:v', 'baseline', '-level', '3.1',
+            '-profile:v', 'baseline', '-level', level,
             '-preset', preset, '-tune', tune,
             '-threads', str(threads),
             '-b:v', f'{bitrate}k', '-maxrate', f'{bitrate}k', '-bufsize', f'{bufsize_k}k',
             '-g', str(gop), '-keyint_min', str(gop), '-sc_threshold', '0', '-bf', '0',
             '-x264-params', 'repeat-headers=1',
-            '-f', 'rtsp', '-rtsp_transport', 'tcp',
+            '-flush_packets', '1', '-muxdelay', '0',
+            '-f', 'rtsp', '-rtsp_transport', transport,
             rtsp_url,
         ]
+
+    def _ffmpeg_usb_direct_cmd(self):
+        """V4L2 → FFmpeg → RTSP, avoiding Python raw-frame copies when CV is off."""
+        width, height = self.config['size']
+        fps = int(self.config.get('framerate', 30) or 30)
+        bitrate = int(self.config.get('bitrate', 2500) or 2500)
+        gop = int(self.config.get('keyframe_interval', 15) or 15)
+        device = str(self.config.get('device_path') or '/dev/video0')
+        input_format = str(self.config.get('usb_input_format') or 'auto').lower()
+        transport = str(self.config.get('rtsp_transport') or 'tcp').lower()
+        if transport not in ('tcp', 'udp'):
+            transport = 'tcp'
+        level = '3.1' if width * height <= 1280 * 720 and fps <= 30 else '4.0'
+        cmd = [
+            self._find_ffmpeg(), '-hide_banner', '-loglevel', 'warning', '-nostats',
+            '-fflags', 'nobuffer', '-flags', 'low_delay',
+            '-thread_queue_size', '2', '-f', 'v4l2',
+        ]
+        if input_format in ('mjpeg', 'mjpg'):
+            cmd += ['-input_format', 'mjpeg']
+        elif input_format in ('yuyv', 'yuy2'):
+            cmd += ['-input_format', 'yuyv422']
+        cmd += [
+            '-framerate', str(fps), '-video_size', f'{width}x{height}',
+            '-i', device, '-an',
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+            '-profile:v', 'baseline', '-level', level,
+            '-preset', str(self.config.get('preset') or 'ultrafast'),
+            '-tune', 'zerolatency', '-threads', str(self._x264_thread_count()),
+            '-b:v', f'{bitrate}k', '-maxrate', f'{bitrate}k',
+            '-bufsize', f'{max(int(bitrate * 0.5), 500)}k',
+            '-g', str(gop), '-keyint_min', str(gop), '-sc_threshold', '0', '-bf', '0',
+            '-x264-params', 'repeat-headers=1',
+            '-flush_packets', '1', '-muxdelay', '0',
+            '-f', 'rtsp', '-rtsp_transport', transport, self._rtsp_url(),
+        ]
+        return cmd
+
+    def _drain_encoder_stderr(self, proc):
+        """Prevent a long-running FFmpeg/GStreamer stderr pipe from filling."""
+        if not proc or not proc.stderr:
+            return
+        last_print = 0.0
+        suppressed = 0
+        try:
+            for raw in iter(proc.stderr.readline, b''):
+                line = raw.decode(errors='replace').strip()
+                if not line:
+                    continue
+                now = time.monotonic()
+                if now - last_print >= 1.0:
+                    note = f" (+{suppressed} lines)" if suppressed else ""
+                    print(f" [ENCODER] {line[:500]}{note}")
+                    last_print = now
+                    suppressed = 0
+                else:
+                    suppressed += 1
+        except Exception:
+            pass
+
+    def _start_stderr_drain(self, proc):
+        self._stderr_thread = Thread(
+            target=self._drain_encoder_stderr,
+            args=(proc,),
+            daemon=True,
+        )
+        self._stderr_thread.start()
 
     def _ffmpeg_h264_copy_rtsp_cmd(self):
         rtsp_url = self._rtsp_url()
@@ -189,6 +263,8 @@ class CameraStreamer:
 
     def _should_use_hw_passthrough(self) -> bool:
         """Stream-only CSI: rpicam-vid HW H.264 — tiết kiệm ~200MB RAM/process vs Picamera2 loop."""
+        if str(self.config.get('source') or 'csi').lower() == 'usb':
+            return False
         mode = os.environ.get('DRONEBRIDGE_HW_PASSTHROUGH', 'auto').lower()
         if mode in ('0', 'off', 'false', 'no'):
             return False
@@ -230,6 +306,8 @@ class CameraStreamer:
 
     def _can_use_h264_stream_path(self) -> bool:
         """Hướng 1 thống nhất: Picamera2 HW H264 — không phụ thuộc Video processing."""
+        if str(self.config.get('source') or 'csi').lower() == 'usb':
+            return False
         if os.environ.get('DRONEBRIDGE_FORCE_RAW_PIPELINE', '').lower() in ('1', 'true', 'yes'):
             return False
         try:
@@ -322,6 +400,7 @@ class CameraStreamer:
                 time.sleep(0.8)
 
                 if self.gst_process.poll() is None:
+                    self._start_stderr_drain(self.gst_process)
                     print(f" {backend} RTSP encoder running (waiting for frames...)")
                     return True
 
@@ -341,6 +420,53 @@ class CameraStreamer:
                 return False
 
         return False
+
+    def start_usb_direct_pipeline(self):
+        """Lowest-latency USB path when detection and overlay are disabled."""
+        if not self._find_ffmpeg():
+            print("✗ ffmpeg not found — falling back to OpenCV pipeline")
+            return self.start_stream_pipeline()
+        self.running.set()
+        urls = self._viewer_urls()
+        print("=" * 60)
+        print(" USB low-latency direct pipeline (V4L2 → FFmpeg → RTSP)")
+        print("=" * 60)
+        print(f" Device: {self.config.get('device_path') or '/dev/video0'}")
+        print(f" Resolution: {self.config['size'][0]}x{self.config['size'][1]} @ {self.config['framerate']} fps")
+        print(f" RTSP: {urls['rtsp']}")
+        print("=" * 60)
+
+        while self.running.is_set():
+            cmd = self._ffmpeg_usb_direct_cmd()
+            try:
+                self.gst_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    start_new_session=True,
+                )
+                time.sleep(0.8)
+                if self.gst_process.poll() is not None:
+                    _, stderr = self.gst_process.communicate(timeout=2)
+                    print(f"✗ USB FFmpeg start failed: {(stderr or b'').decode(errors='replace')[-1000:]}")
+                else:
+                    self._start_stderr_drain(self.gst_process)
+                    print(f" USB stream live — WebRTC: {urls['webrtc']}")
+                    while self.running.is_set() and self.gst_process.poll() is None:
+                        time.sleep(0.5)
+            except Exception as exc:
+                print(f"✗ USB direct pipeline error: {exc}")
+            finally:
+                if self.gst_process and self.gst_process.poll() is None:
+                    self.gst_process.terminate()
+                    try:
+                        self.gst_process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        self.gst_process.kill()
+                self.gst_process = None
+            if self.running.is_set():
+                print(" [WARN] USB stream stopped — retrying in 2s")
+                time.sleep(2)
     
     def draw_overlay(self, frame, detection_result):
         """Backward-compatible wrapper — logic in processing.overlay."""
@@ -481,10 +607,15 @@ class CameraStreamer:
         urls = self._viewer_urls()
 
         print("=" * 60)
-        print(" Camera Streamer (unified: Picamera2 → GStreamer RTSP)")
+        source = str(self.config.get('source') or 'csi').lower()
+        source_label = (
+            f"USB V4L2 {self.config.get('device_path') or '(auto)'}"
+            if source == 'usb' else f"CSI libcamera index {lib_idx}"
+        )
+        print(" Camera Streamer (capture → H.264 → RTSP)")
         print("=" * 60)
         print(f" Platform: {os_name}")
-        print(f" Stream cam{cam_id} | libcamera index {lib_idx}")
+        print(f" Stream cam{cam_id} | {source_label}")
         print(f" Resolution: {self.config['size'][0]}x{self.config['size'][1]} @ {self.config['framerate']} fps")
         print(f" Server: {self.config['mediamtx_host']}:{self.config['mediamtx_port']}")
         print(f" Detection: {'ON' if self.config.get('detection_enabled') else 'OFF'} | "
@@ -565,6 +696,13 @@ class CameraStreamer:
 
     def start(self):
         """Entry — cam0/cam1 cùng Hướng 1; Video processing chỉ bật Hướng 2."""
+        if str(self.config.get('source') or 'csi').lower() == 'usb':
+            if bool(self.config.get('usb_direct_mode', True)) and not self._cv_enabled():
+                self.start_usb_direct_pipeline()
+            else:
+                print(" USB webcam selected — using V4L2/OpenCV capture + H.264 RTSP encoder")
+                self.start_stream_pipeline()
+            return
         if self._can_use_h264_stream_path():
             self.start_h264_stream_pipeline()
         else:
@@ -647,4 +785,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

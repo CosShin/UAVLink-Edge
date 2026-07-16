@@ -1169,6 +1169,26 @@ Loading GPS information...
                         </div>
                     </div>
                     <div id="cam0-status-line" class="cam-status-line warn">Loading...</div>
+                    <label class="form-label">Video source</label>
+                    <select id="cam0-source" class="form-select cam-form-input" onchange="updateCameraSourceUI('cam0')">
+                        <option value="csi">CSI camera (J30)</option>
+                        <option value="usb">USB webcam (V4L2)</option>
+                    </select>
+                    <div id="cam0-usb-settings" style="display:none; margin-top:0.75rem">
+                        <label class="form-label">USB device</label>
+                        <select id="cam0-device" class="form-select cam-form-input" onchange="updateCameraSourceUI('cam0')">
+                            <option value="/dev/video0">/dev/video0</option>
+                        </select>
+                        <label class="form-label" style="margin-top:0.75rem">USB capture format</label>
+                        <select id="cam0-usb-input-format" class="form-select cam-form-input" onchange="markCameraFormDirty()">
+                            <option value="auto">Auto</option>
+                            <option value="mjpeg">MJPEG (recommended for 720p/1080p)</option>
+                            <option value="yuyv">YUYV (uncompressed)</option>
+                        </select>
+                        <small style="color: var(--text-secondary); display:block; margin-top:0.25rem">
+                            Chọn webcam được phát hiện. Không cần cấu hình overlay hoặc reboot CM5.
+                        </small>
+                    </div>
                     <label class="form-label">Sensor</label>
                     <select id="port-cam0-overlay" class="form-select cam-form-input" onchange="onCameraSensorChange('cam0')"></select>
                     <label class="form-label" style="margin-top:0.75rem">Resolution</label>
@@ -1242,6 +1262,26 @@ Loading GPS information...
                         </div>
                     </div>
                     <div id="cam1-status-line" class="cam-status-line warn">Loading...</div>
+                    <label class="form-label">Video source</label>
+                    <select id="cam1-source" class="form-select cam-form-input" onchange="updateCameraSourceUI('cam1')">
+                        <option value="csi">CSI camera (J29)</option>
+                        <option value="usb">USB webcam (V4L2)</option>
+                    </select>
+                    <div id="cam1-usb-settings" style="display:none; margin-top:0.75rem">
+                        <label class="form-label">USB device</label>
+                        <select id="cam1-device" class="form-select cam-form-input" onchange="updateCameraSourceUI('cam1')">
+                            <option value="/dev/video0">/dev/video0</option>
+                        </select>
+                        <label class="form-label" style="margin-top:0.75rem">USB capture format</label>
+                        <select id="cam1-usb-input-format" class="form-select cam-form-input" onchange="markCameraFormDirty()">
+                            <option value="auto">Auto</option>
+                            <option value="mjpeg">MJPEG (recommended for 720p/1080p)</option>
+                            <option value="yuyv">YUYV (uncompressed)</option>
+                        </select>
+                        <small style="color: var(--text-secondary); display:block; margin-top:0.25rem">
+                            Chọn webcam được phát hiện. Không cần cấu hình overlay hoặc reboot CM5.
+                        </small>
+                    </div>
                     <label class="form-label">Sensor</label>
                     <select id="port-cam1-overlay" class="form-select cam-form-input" onchange="onCameraSensorChange('cam1')"></select>
                     <label class="form-label" style="margin-top:0.75rem">Resolution</label>
@@ -1332,6 +1372,7 @@ Loading GPS information...
 
         let cameraRegistry = [];
         let cameraDefaultStreamProfile = null;
+        let cameraUsbDevices = [];
         let cameraSavedSnapshot = null;
         let cameraApplyReady = false;
 
@@ -1533,6 +1574,45 @@ Loading GPS information...
             });
         }
 
+        function populateUsbDeviceSelect(port, selectedValue) {
+            const sel = document.getElementById(port + '-device');
+            if (!sel) return;
+            const selected = selectedValue || sel.value || '/dev/video0';
+            const devices = cameraUsbDevices.map(c => c.device).filter(Boolean);
+            if (!devices.includes(selected)) devices.push(selected);
+            sel.innerHTML = '';
+            devices.forEach(device => {
+                const camera = cameraUsbDevices.find(c => c.device === device);
+                const opt = document.createElement('option');
+                opt.value = device;
+                opt.textContent = camera ? `${camera.name || 'USB webcam'} (${device})` : `${device} (saved/default)`;
+                sel.appendChild(opt);
+            });
+            sel.value = selected;
+        }
+
+        function updateCameraSourceUI(port, silent) {
+            const sourceEl = document.getElementById(port + '-source');
+            const source = sourceEl ? sourceEl.value : 'csi';
+            const usbBox = document.getElementById(port + '-usb-settings');
+            const sensorEl = document.getElementById('port-' + port + '-overlay');
+            if (usbBox) usbBox.style.display = source === 'usb' ? 'block' : 'none';
+            if (sensorEl) sensorEl.disabled = source === 'usb';
+            if (source === 'usb') {
+                populateUsbDeviceSelect(port);
+                const line = document.getElementById(port + '-status-line');
+                const deviceEl = document.getElementById(port + '-device');
+                if (line) {
+                    const found = cameraUsbDevices.some(c => c.device === (deviceEl && deviceEl.value));
+                    line.className = 'cam-status-line ' + (found ? 'ok' : 'warn');
+                    line.textContent = found
+                        ? `USB webcam · ${deviceEl.value} · OK`
+                        : `USB webcam · ${deviceEl ? deviceEl.value : '/dev/video0'} · chưa phát hiện`;
+                }
+            }
+            if (!silent) markCameraFormDirty();
+        }
+
         function updateCamLiveBadge(port) {
             const enabled = isCamEnabledToggle(port);
             const badge = document.getElementById(port + '-live-badge');
@@ -1621,6 +1701,14 @@ Loading GPS information...
                     const sizeStr = `${config.size[0]}x${config.size[1]}`;
                     const resEl = document.getElementById(port + '-resolution');
                     const fmtEl = document.getElementById(port + '-format');
+                    const sourceEl = document.getElementById(port + '-source');
+                    const deviceEl = document.getElementById(port + '-device');
+                    const usbInputFormatEl = document.getElementById(port + '-usb-input-format');
+                    if (sourceEl) sourceEl.value = config.source || 'csi';
+                    populateUsbDeviceSelect(port, config.device_path || '/dev/video0');
+                    if (deviceEl) deviceEl.value = config.device_path || '/dev/video0';
+                    if (usbInputFormatEl) usbInputFormatEl.value = config.usb_input_format || 'auto';
+                    updateCameraSourceUI(port, true);
                     const overlaySel = document.getElementById('port-' + port + '-overlay');
                     const overlay = overlaySel ? overlaySel.value : '';
                     if (resEl) {
@@ -1686,15 +1774,22 @@ Loading GPS information...
         function renderCameraDetect(data) {
             if (!data) return;
 
-            const ok = data.connected_count || 0;
+            cameraUsbDevices = data.usb_cameras || [];
+            ['cam0', 'cam1'].forEach(port => {
+                const deviceEl = document.getElementById(port + '-device');
+                populateUsbDeviceSelect(port, deviceEl ? deviceEl.value : '/dev/video0');
+            });
+
+            const ok = data.total_connected_count ?? data.connected_count ?? 0;
             const exp = data.expected_count || 0;
             const status = document.getElementById('camera-settings-status');
             if (status) {
                 status.className = 'status-indicator ' + (ok > 0 ? (ok >= exp ? 'status-success' : 'status-info') : 'status-error');
-                const sensors = (data.connected || []).map(c => (c.sensor || '').toUpperCase()).join(' + ');
+                const sensors = (data.connected || []).map(c => (c.sensor || '').toUpperCase())
+                    .concat(cameraUsbDevices.map(c => c.name || c.device)).join(' + ');
                 status.textContent = sensors
-                    ? `✓ ${ok}/${exp} cameras · ${sensors}`
-                    : `✓ ${ok}/${exp} cameras · ${data.supported_types || 0} types supported`;
+                    ? `✓ ${ok} camera(s) · ${sensors}`
+                    : `✗ No camera detected · ${data.supported_types || 0} CSI types supported`;
             }
 
             if (data.ports) {
@@ -1712,6 +1807,11 @@ Loading GPS information...
                     }
                     const line = document.getElementById(p + '-status-line');
                     if (line) {
+                        const sourceEl = document.getElementById(p + '-source');
+                        if (sourceEl && sourceEl.value === 'usb') {
+                            updateCameraSourceUI(p, true);
+                            return;
+                        }
                         const idx = port.libcamera_index != null ? port.libcamera_index : '—';
                         const sensor = (port.sensor || port.overlay || '').toUpperCase();
                         if (port.status === 'ok') {
@@ -1841,6 +1941,9 @@ Loading GPS information...
             const enabled = isCamEnabledToggle(port);
             const resEl = document.getElementById(port + '-resolution');
             const fmtEl = document.getElementById(port + '-format');
+            const sourceEl = document.getElementById(port + '-source');
+            const deviceEl = document.getElementById(port + '-device');
+            const usbInputFormatEl = document.getElementById(port + '-usb-input-format');
             const resolution = resEl ? resEl.value : '640x480';
             const format = fmtEl ? fmtEl.value : 'BGR888';
             const [width, height] = resolution.split('x').map(Number);
@@ -1861,6 +1964,9 @@ Loading GPS information...
             const landing = parseLandingModeSelect(modeEl ? modeEl.value : 'contour_h');
             return {
                 camera_id: id,
+                source: sourceEl ? sourceEl.value : 'csi',
+                device_path: sourceEl && sourceEl.value === 'usb' && deviceEl ? deviceEl.value : '',
+                usb_input_format: usbInputFormatEl ? usbInputFormatEl.value : 'auto',
                 enabled: enabled,
                 size: [width, height],
                 format: format,

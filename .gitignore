@@ -7,3 +7,10 @@ vpn_config.json
 data/logs/
 data/connection_config.json
 *.log
+  *.pyc
+  *.log
+  .drone_secret
+  .env
+  data/
+  _bootstrap/*.egg-info/
+  Find_landing/camera_detected.json

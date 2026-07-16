@@ -1,4 +1,4 @@
-"""Overlay ArUco v2 — vẽ toàn bộ marker trên bảng + tâm đáp."""
+"""Overlay ArUco v3 — vẽ toàn bộ marker trên bảng + tâm đáp."""
 
 from processing.overlay_style import (
     FONT_SCALE_LABEL,
@@ -13,8 +13,17 @@ def draw(frame, detection_result: dict):
     import cv2
     import numpy as np
 
+    instances = detection_result.get("aruco_instances") or []
     by_id = detection_result.get("aruco_markers_by_id")
-    if by_id:
+    if instances:
+        for item in instances:
+            corners = item.get("corners") or []
+            if len(corners) >= 4:
+                pts = np.array(corners, dtype=np.int32).reshape((-1, 1, 2))
+                cv2.polylines(frame, [pts], True, (0, 200, 0), MARKER_BORDER)
+                x, y = corners[0]
+                cv2.putText(frame, str(item.get("id")), (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1, cv2.LINE_AA)
+    elif by_id:
         for corners in by_id.values():
             if len(corners) >= 4:
                 pts = np.array(corners, dtype=np.int32).reshape((-1, 1, 2))
@@ -33,9 +42,12 @@ def draw(frame, detection_result: dict):
     aid = detection_result.get("aruco_id", 0)
     n = detection_result.get("aruco_marker_count", 1)
     ids = detection_result.get("aruco_visible_ids", [])
-    label = f"ARUCO v2 ID={aid}"
-    if n > 1:
-        label += f" ({n} visible: {ids})"
+    if detection_result.get("mode") == "board":
+        label = f"ARUCO BOARD ({n} visible: {ids})"
+        if detection_result.get("close_single_marker_fallback"):
+            label += " [CLOSE-1]"
+    else:
+        label = f"ARUCO v3 ID={aid}"
     if detection_result.get("hold"):
         label += " [HOLD]"
 

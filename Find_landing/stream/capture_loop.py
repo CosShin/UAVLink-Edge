@@ -64,10 +64,14 @@ def run_capture_loop(streamer, pipe_write_fd: int):
     frame_count = 0
     encode_drops = 0
     last_stats_time = time.time()
+    last_landing_write = 0.0
     streamer.start_time = time.time()
     last_sent_at_stats = 0
     low_fps_streak = 0
     encode_drops_at_last_stats = 0
+    capture_failures = 0
+    usb_source = str(config.get("source") or "csi").lower() == "usb"
+    reconnect_after = max(10, int(config.get("framerate", 30) or 30))
 
     try:
         while streamer.running.is_set():
@@ -87,14 +91,31 @@ def run_capture_loop(streamer, pipe_write_fd: int):
             if processing is None:
                 frame_wire = source.capture_wire(config)
                 if frame_wire is None:
+                    capture_failures += 1
+                    if usb_source and capture_failures >= reconnect_after:
+                        print(" [WARN] USB webcam stopped delivering frames — reconnecting...")
+                        source.close()
+                        while streamer.running.is_set() and not source.open():
+                            print(" [WARN] USB webcam unavailable — retrying in 2s")
+                            time.sleep(2)
+                        capture_failures = 0
                     continue
             else:
                 frame_bgr = source.capture_bgr()
                 if frame_bgr is None:
+                    capture_failures += 1
+                    if usb_source and capture_failures >= reconnect_after:
+                        print(" [WARN] USB webcam stopped delivering frames — reconnecting...")
+                        source.close()
+                        while streamer.running.is_set() and not source.open():
+                            print(" [WARN] USB webcam unavailable — retrying in 2s")
+                            time.sleep(2)
+                        capture_failures = 0
                     continue
                 frame_gated = gate.resolve(frame_count, frame_bgr)
                 frame_wire = bgr_to_wire(frame_gated, config)
 
+            capture_failures = 0
             frame_count += 1
 
             drops = encoder.enqueue(frame_wire)
@@ -104,6 +125,16 @@ def run_capture_loop(streamer, pipe_write_fd: int):
             if processing:
                 streamer.detections_count = processing.detections_count
                 streamer.detection_result = processing.latest_detection()
+                # LANDING_TARGET needs a fresh target at >= 1 Hz.  Keep the
+                # file publisher at 10 Hz instead of tying it to 5 s stats.
+                if current_time - last_landing_write >= 0.1:
+                    write_landing_telemetry(
+                        int(config.get("camera_id", 0)),
+                        streamer.detection_result,
+                        processing.detections_count,
+                        config.get("size"),
+                    )
+                    last_landing_write = current_time
 
             if frame_count == 1 and encoder.frames_sent == 0:
                 print(" First frame queued for encoder")
@@ -126,12 +157,6 @@ def run_capture_loop(streamer, pipe_write_fd: int):
                     print(f" [WARN] Encoder backlog — dropped {drops_this_window} frame(s) (total {encode_drops})")
                 write_stats(config, encoder.frames_sent, streamer.start_time,
                             capture_fps, encode_drops, window_fps)
-                if processing:
-                    write_landing_telemetry(
-                        int(config.get("camera_id", 0)),
-                        processing.latest_detection(),
-                        processing.detections_count,
-                    )
                 if window_fps < 18:
                     low_fps_streak += 1
                     if low_fps_streak == 3:

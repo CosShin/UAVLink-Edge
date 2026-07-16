@@ -2,25 +2,30 @@ auth:
   enabled: true
   host: 45.117.171.237
   port: 5770
-  uuid: 0000000f-0000-0000-0000-00000000000f
+  uuid: 00000011-0000-0000-0000-000000000011
   shared_secret: drone-fleet-shared-secret-auth-key-2025
   keepalive_interval: 30
   session_heartbeat_frequency: 1.0
   vehicle_type: 0
   model: ''
 network:
-  connection_type: prefer_ethernet
-  serial_port: /dev/ttyAMA2
+  connection_type: serial
+  serial_port: /dev/ttyAMA0
   serial_baud: 921600
   tcp_host: 0.0.0.0
   tcp_port: 14540
-  local_listen_port: 14550
-  target_host: 10.8.0.1
+  local_listen_port: 14540
+  local_inject_port: 14600
+  target_host: 45.117.171.237
   target_port: 14550
   protocol: udp
-  mode: prefer_4g
+  mode: wifi_only
   cloud_wifi_fallback: false
-  forward_gps_raw_int: false
+  forward_gps_raw_int: true
+  # Forward all packets and request a full ~70 msg/s telemetry profile.
+  forward_all_mavlink: true
+  # DISARMED indoor bench: relay Wi-Fi GPS without waiting for Pixhawk echo.
+  wifi_gps_relay_to_server: true
   fallback_delay: 300
 ethernet:
   interface: eth0
@@ -33,13 +38,13 @@ ethernet:
   pixhawk_connection_timeout: 30
   allow_missing_pixhawk: true
 mavlink:
-  connection_type: prefer_ethernet
-  serial_port: /dev/ttyAMA2
+  connection_type: serial
+  serial_port: /dev/ttyAMA0
   serial_baud: 921600
   tcp_host: 0.0.0.0
   tcp_port: 14540
 forwarding:
-  target_host: 10.8.0.1
+  target_host: 45.117.171.237
   target_port: 14550
   protocol: udp
 web:
@@ -63,32 +68,55 @@ camera:
     enabled: true
     size:
     - 1280
-    - 960
+    - 720
     framerate: 30
-    bitrate: 6000
+    bitrate: 2500
     format: BGR888
     brightness: 0.0
     contrast: 1.0
     exposure_time: 0
     detection_enabled: true
     overlay_enabled: true
-    keyframe_interval: 30
+    keyframe_interval: 15
     preset: ultrafast
     tune: zerolatency
     overlay_burn_enabled: true
     landing_detection_mode: aruco
     aruco_dictionary: DICT_4X4_50
     gate_timeout_ms: 0
-    detect_frame_skip: 3
-    overlay_frame_skip: 5
+    detect_frame_skip: 2
+    overlay_frame_skip: 2
     detection_lost_hold_ms: 1500
     detection_reacquire_ms: 2500
     aruco_marker_id: 5
+    # single: one unique marker ID; board: fuse IDs 0..11 using known layout.
+    aruco_target_strategy: board
+    aruco_board_first_id: 0
+    aruco_board_cols: 3
+    aruco_board_rows: 4
+    # Ratios match the generated 3x4 board sheet (marker side = 1.0).
+    aruco_board_gap_x_ratio: 0.16
+    aruco_board_gap_y_ratio: 0.34
+    aruco_board_ransac_threshold_px: 3.0
+    aruco_board_min_markers: 2
+    # Close: one fully visible large board marker is enough; far: retry at 960px.
+    aruco_board_close_single_marker_area_ratio: 0.08
+    aruco_reacquire_detect_width: 960
+    # Required only for metric PnP pose; keep 0 until the printed marker is measured.
+    aruco_marker_length_m: 0.0
+    aruco_calibration_file: ''
+    aruco_min_quality: 0.55
+    aruco_acquire_frames: 5
     sharpness: 1.5
     saturation: 1.0
     lores_size:
     - 320
     - 240
+    source: usb
+    usb_input_format: mjpeg
+    device_path: /dev/video0
+    usb_direct_mode: false
+    rtsp_transport: tcp
   - name: cam1
     camera_id: 1
     enabled: false
@@ -118,15 +146,25 @@ camera:
     lores_size:
     - 320
     - 240
+    detection_lost_hold_ms: 1500
+    source: csi
+    usb_input_format: auto
+    device_path: ''
 landing:
   environment: outdoor
   marker_type: H
   mode: normal
   safety_level: 2
   template: H
-  mavlink_enabled: false
+  mavlink_enabled: true
   mavlink_hz: 10
-  mavlink_camera_id: 1
+  mavlink_camera_id: 0
+  # Calibrate these two values for the actual USB webcam before enabling MAVLink landing.
+  camera_hfov_deg:  60.0 
+  camera_vfov_deg:  45.0 
+  min_quality: 0.55
+  max_measurement_age_ms: 300
+  require_control_valid: true
 lcd:
   enabled: false
   auto_setup: false
@@ -140,7 +178,7 @@ lcd:
 video:
   source: none
   mediamtx_rtsp: rtsp://45.117.171.237:8554
-  stream_name: drone28
+  stream_name: 00000011-0000-0000-0000-000000000011/cam0
   usb_device: /dev/video0
   width: 1280
   height: 720
@@ -150,7 +188,7 @@ log:
   level: info
   verbose: false
 vpn:
-  enabled: true
+  enabled: false
   config_file: vpn_config.json
   server_endpoint: 45.117.171.237:51820
   router_vpn_ip: 10.8.0.1

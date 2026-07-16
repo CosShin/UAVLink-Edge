@@ -83,13 +83,7 @@ def _read_external_landing(camera_id: int) -> dict:
             data = json.load(f)
         if time.time() - float(data.get("updated_at", 0)) > 2.0:
             return {"detected": False}
-        return {
-            "detected": bool(data.get("detected")),
-            "offset_x": data.get("offset_x"),
-            "offset_y": data.get("offset_y"),
-            "direction": data.get("direction"),
-            "similarity": data.get("similarity"),
-        }
+        return dict(data)
     except Exception:
         return {"detected": False}
 
@@ -336,7 +330,12 @@ def run_h264_stream_loop(streamer) -> bool:
                 streamer.detections_count = processing.detections_count
                 streamer.detection_result = processing.latest_detection()
                 if now - last_landing_write >= 0.1:
-                    write_landing_telemetry(camera_id, streamer.detection_result, processing.detections_count)
+                    write_landing_telemetry(
+                        camera_id,
+                        streamer.detection_result,
+                        processing.detections_count,
+                        config.get("size"),
+                    )
                     last_landing_write = now
 
             if now - last_stats >= 5.0:

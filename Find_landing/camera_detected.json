@@ -1,0 +1,16 @@
+{
+  "updated_at": "2026-07-13T18:08:48.139108+00:00",
+  "ports": {
+    "cam0": {
+      "overlay": "imx219",
+      "sensor": "imx219",
+      "enabled": true
+    },
+    "cam1": {
+      "overlay": "imx219",
+      "sensor": "imx219",
+      "enabled": false
+    }
+  },
+  "last_connected": []
+}

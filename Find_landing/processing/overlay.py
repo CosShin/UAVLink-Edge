@@ -52,13 +52,19 @@ def draw_overlay(frame, detection_result, overlay_enabled: bool = True, *, coord
     if not detection_result.get("detected", False):
         searching = detection_result.get("searching_id")
         visible = detection_result.get("aruco_visible_ids")
-        if searching is not None:
+        if detection_result.get("ambiguous"):
+            msg = f"AMBIGUOUS: {detection_result.get('reason', 'duplicate target')}"
+            put_text_line(frame, 0, msg, (0, 0, 255), FONT_SCALE_LABEL)
+        elif searching is not None:
             msg = f"SEARCHING ArUco ID={searching}"
             if visible:
                 msg += f" (visible: {visible})"
             put_text_line(frame, 0, msg, (0, 255, 255), FONT_SCALE_LABEL)
         else:
             put_text_line(frame, 0, "SEARCHING...", (0, 255, 255), FONT_SCALE_LABEL)
+        state = detection_result.get("tracking_state")
+        if state:
+            put_text_line(frame, 1, f"Vision state: {state}", (0, 180, 255), FONT_SCALE_BODY)
         return frame
 
     fh, fw = frame.shape[:2]
@@ -86,7 +92,15 @@ def draw_overlay(frame, detection_result, overlay_enabled: bool = True, *, coord
     else:
         put_text_line(frame, 2, "ALIGNED!", (0, 255, 0), FONT_SCALE_BODY)
     sim = detection_result.get("similarity", 0)
-    put_text_line(frame, 3, f"Score: {sim:.3f}", (255, 255, 255), FONT_SCALE_BODY)
+    state = detection_result.get("tracking_state", "")
+    valid = bool(detection_result.get("control_valid"))
+    put_text_line(
+        frame,
+        3,
+        f"Quality: {sim:.3f} | {state} | CTRL={'YES' if valid else 'NO'}",
+        (0, 255, 0) if valid else (0, 200, 255),
+        FONT_SCALE_BODY,
+    )
     return frame
 
 
@@ -105,7 +119,7 @@ class OverlayProcessor(FrameProcessor):
 
         detection = state.get("detection_result")
         out = np.array(frame_bgr, copy=True)
-        if detection and detection.get("detected"):
+        if detection:
             state["overlay_frame"] = draw_overlay(out, detection, True)
         elif self.detection_enabled:
             put_text_line(out, 0, "SEARCHING...", (0, 255, 255), FONT_SCALE_LABEL)

@@ -19,10 +19,51 @@ _PX4_MAIN_MODES = {
     9: "SIMPLE",
 }
 
+_ARDUCOPTER_MODES = {
+    0: "STABILIZE",
+    1: "ACRO",
+    2: "ALT_HOLD",
+    3: "AUTO",
+    4: "GUIDED",
+    5: "LOITER",
+    6: "RTL",
+    7: "CIRCLE",
+    9: "LAND",
+    11: "DRIFT",
+    13: "SPORT",
+    14: "FLIP",
+    15: "AUTOTUNE",
+    16: "POSHOLD",
+    17: "BRAKE",
+    18: "THROW",
+    19: "AVOID_ADSB",
+    20: "GUIDED_NOGPS",
+    21: "SMART_RTL",
+    22: "FLOWHOLD",
+    23: "FOLLOW",
+    24: "ZIGZAG",
+    25: "SYSTEMID",
+    26: "AUTOROTATE",
+    27: "AUTO_RTL",
+}
+
 
 def _px4_flight_mode(custom_mode: int) -> str:
     main = (int(custom_mode) >> 16) & 0xFF
     return _PX4_MAIN_MODES.get(main, f"MODE_{main}")
+
+
+def _flight_mode(msg) -> str:
+    """Decode HEARTBEAT custom_mode using the vehicle's actual autopilot."""
+    custom_mode = int(getattr(msg, "custom_mode", 0) or 0)
+    autopilot = int(getattr(msg, "autopilot", -1))
+    # MAV_AUTOPILOT_ARDUPILOTMEGA=3, MAV_AUTOPILOT_PX4=12. Keep the numeric
+    # constants here so this small cache does not need a pymavlink import.
+    if autopilot == 3:
+        return _ARDUCOPTER_MODES.get(custom_mode, f"MODE_{custom_mode}")
+    if autopilot == 12:
+        return _px4_flight_mode(custom_mode)
+    return f"MODE_{custom_mode}"
 
 
 def _gps_fix_label(fix_type: int, sats: int) -> str:
@@ -60,7 +101,7 @@ class TelemetryCache:
         msg_type = msg.get_type()
         with self._lock:
             if msg_type == "HEARTBEAT":
-                self.flight_mode = _px4_flight_mode(getattr(msg, "custom_mode", 0))
+                self.flight_mode = _flight_mode(msg)
                 self._touch()
             elif msg_type == "VFR_HUD":
                 self.altitude_m = float(getattr(msg, "alt", 0) or 0)
@@ -84,6 +125,15 @@ class TelemetryCache:
                 vb = getattr(msg, "voltage_battery", None)
                 if vb:
                     self.voltage_v = float(vb) / 1000.0
+                br = getattr(msg, "battery_remaining", None)
+                if br is not None and int(br) >= 0:
+                    self.battery_pct = float(br)
+                self._touch()
+            elif msg_type == "BATTERY_STATUS":
+                voltages = getattr(msg, "voltages", None) or []
+                valid_cells = [int(value) for value in voltages if 0 < int(value) < 65535]
+                if valid_cells:
+                    self.voltage_v = float(sum(valid_cells)) / 1000.0
                 br = getattr(msg, "battery_remaining", None)
                 if br is not None and int(br) >= 0:
                     self.battery_pct = float(br)

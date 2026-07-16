@@ -128,6 +128,46 @@ Manual:
 sudo bash apply_camera_overlay.sh config.yaml --force-reboot
 ```
 
+## USB webcam streaming
+
+USB UVC webcams are supported alongside CSI cameras. Connect the webcam, then open
+**Settings → Camera CM5**:
+
+1. Select **Video source → USB webcam (V4L2)** for CAM0 or CAM1.
+2. Select the detected device, for example `/dev/video0`.
+3. Choose resolution and enable/disable landing detection or overlay as needed.
+   Keep **USB capture format = Auto** first; use **MJPEG** when the webcam cannot
+   sustain 720p/1080p at the selected frame rate.
+4. Click **Save**, then **Restart stream**. A USB webcam does not require a CSI
+   overlay or a CM5 reboot.
+
+The stream is published to the same MediaMTX paths as CSI: `/<drone-uuid>/cam0`
+or `/<drone-uuid>/cam1`. Verify devices and formats with:
+
+```bash
+v4l2-ctl --list-devices
+v4l2-ctl --device /dev/video0 --list-formats-ext
+```
+
+If the required camera packages are missing, install them once with
+`python3 install.py --apt-only`. The streamer automatically reconnects after a
+USB webcam is unplugged and plugged back into the same device node.
+
+For manual configuration, add `source` and `device_path` to the selected stream:
+
+```yaml
+camera:
+  streams:
+    - name: cam0
+      camera_id: 0
+      source: usb
+      device_path: /dev/video0
+      enabled: true
+      size: [1280, 720]
+      framerate: 30
+      format: BGR888
+```
+
 ---
 
 ## What's included (2026-07 sync)
@@ -177,6 +217,7 @@ UAVLink-Edge-Python/
 ├── cloud_egress.py
 ├── camera_mavlink.py
 ├── landing_mavlink.py
+├── wifi_gps.py                 # Wi-Fi JSON GPS → MAVLink GPS_INPUT
 ├── setup_camera.sh             # Boot overlay for CSI cameras
 ├── apply_camera_overlay.sh
 ├── install_camera_sudoers.sh   # One-time per Pi (auto user)
@@ -258,6 +299,176 @@ ping -c2 10.41.10.2
 3. **Reboot CM5** → ghi overlay (nếu cần) và **luôn reboot Pi** (~2 phút offline)
 
 `install_camera_sudoers.sh` **không** thay `./run.sh` — chỉ cấp quyền `sudo -n` cho tính năng camera khi app đang chạy bằng user thường.
+
+### Chuyển tiếp toàn bộ MAVLink lên server
+
+Đặt `network.forward_all_mavlink: true` để chuyển tiếp mọi message MAVLink hợp lệ
+nhận từ Pixhawk sau lớp xác thực/session. Forwarder vẫn loại heartbeat không phải
+Pixhawk và không phản xạ gói downlink ngược lên server để tránh vòng lặp. Nó yêu
+cầu profile telemetry đầy đủ khoảng 70 msg/s: attitude/IMU 10 Hz, vị trí/RC/servo
+5 Hz, GPS/EKF 2 Hz và các trạng thái hệ thống/pin 1 Hz. Message firmware không hỗ
+trợ sẽ được bỏ qua. Nếu firmware chỉ phát điện áp trong `SYS_STATUS`, forwarder
+giữ nguyên gói gốc và tạo thêm `BATTERY_STATUS` tương thích để giao diện server
+không còn hiển thị `0 V`.
+
+Khi server gửi `MAV_CMD_DO_SET_MODE` (176), edge chuẩn hóa `param1=1` và giữ
+flight-mode ArduCopter trong `param2`. Nếu `MAV_CMD_MISSION_START` (300) tới khi
+heartbeat chưa báo AUTO, edge yêu cầu AUTO trước, chờ heartbeat xác nhận tối đa
+8 giây rồi mới chuyển lệnh start. Nếu AUTO vẫn bị từ chối, lệnh start bị hủy và
+log yêu cầu kiểm tra mission đã upload cùng item `NAV_TAKEOFF`; edge không tự tạo
+mission để tránh cất cánh ngoài kế hoạch.
+
+### GPS qua Wi-Fi để test trong nhà
+
+Wi-Fi chỉ vận chuyển tọa độ từ điện thoại/server; nó không tự đo vị trí. Trên
+Mission Planner, đặt `GPS1_TYPE = 14` (`MAVLink`) rồi reboot Pixhawk. Nếu firmware
+cũ hiển thị tên `GPS_TYPE` thì dùng tham số đó. Khi muốn dùng lại GPS vật lý, trả
+tham số về `Auto`/giá trị ban đầu.
+
+Chạy UAVLink trước để nó giữ duy nhất kết nối serial:
+
+```bash
+./run.sh
+```
+
+Ở terminal thứ hai, nhận JSON từ điện thoại/server trên UDP 25100. Nên đặt token:
+
+```bash
+WIFI_GPS_TOKEN='doi-token-nay' ./wifi_gps.py
+```
+
+Nếu terminal chỉ hiện `Nhận GPS JSON...` và `GPS_INPUT...` thì chương trình mới
+đang lắng nghe, chưa có GPS. Chỉ khi thấy dòng `GPS OK ... injected=N` mới có
+fix đang được bơm vào `main.py`/Pixhawk. Nguồn điện thoại phải gửi liên tục vì
+gói cũ quá 2 giây sẽ bị ngắt.
+
+Với `network.wifi_gps_relay_to_server: true`, forwarder đồng thời đổi fix này
+thành `GPS_RAW_INT` và gửi thẳng lên server qua kết nối Wi-Fi đã xác thực. Nhờ
+đó bản đồ/trạng thái GPS trên server không phải chờ Pixhawk echo lại GPS ngoài.
+Khi Pixhawk đã tự phát `GPS_RAW_INT`, relay tự nhường cho dữ liệu Pixhawk để
+tránh gửi trùng. Relay trực tiếp chỉ chạy khi Pixhawk **DISARMED**; khi ARM,
+server chỉ nhận GPS do Pixhawk phát. Chỉ bật tùy chọn này khi test trong nhà và
+tắt trước khi bay thật.
+
+Điện thoại/server gửi tới `<IP_CM5>:25100`:
+
+```json
+{
+  "token": "doi-token-nay",
+  "lat": 10.762622,
+  "lon": 106.660172,
+  "alt_m": 12.5,
+  "accuracy_m": 5.0,
+  "speed_m_s": 0.0,
+  "course_deg": 0.0,
+  "fix_type": 3,
+  "satellites": 10
+}
+```
+
+Nếu gói Wi-Fi cũ quá 2 giây, chương trình tự dừng phát `GPS_INPUT`. Chế độ tọa độ
+cố định chỉ dùng khi tháo cánh/quạt và DISARMED:
+
+```bash
+./wifi_gps.py --fixed 10.762622,106.660172,12.5 --bench-confirm
+```
+
+#### Bench GPS lai Wi-Fi + camera ArUco nhìn xuống
+
+Chế độ thử nghiệm này chốt fix Wi-Fi đầu tiên làm tọa độ gốc, rồi cộng dịch
+chuyển X/Y đo theo mét từ ArUco board. Nó chỉ phát `GPS_INPUT` khi cả gói Wi-Fi
+và pose camera đều mới/hợp lệ; mất board, tracking kém hoặc pose nhảy bất thường
+thì dừng phát.
+
+Pose mét yêu cầu camera `aruco_target_strategy: board`, calibration đúng camera
+và kích thước cạnh marker đen-vuông đã đo thật, ví dụ:
+
+```yaml
+aruco_target_strategy: board
+aruco_calibration_file: camera_calibration_1280x720.yaml
+aruco_marker_length_m: 0.20  # thay bằng số đo thật, không đoán
+```
+
+Sau khi `./run.sh` đã chạy camera detector, tháo cánh/quạt và chạy ở terminal
+thứ hai:
+
+```bash
+WIFI_GPS_TOKEN='doi-token-nay' ./wifi_gps.py \
+  --vision-camera-id 0 \
+  --vision-heading-deg 0 \
+  --bench-confirm
+```
+
+`--vision-heading-deg` là hướng la bàn của trục +X trên bản in (từ trái sang
+phải): `0` nếu cạnh đó hướng Bắc, `90` nếu hướng Đông. Nguồn Wi-Fi vẫn phải gửi
+JSON liên tục. Quan sát `vision_N`/`vision_E` khi di chuyển drone bằng tay; chưa
+dùng chế độ này để ARM hoặc bay trong nhà. Khi thêm `--dry-run`, chương trình chỉ
+kiểm tra dữ liệu và **không** gửi `GPS_INPUT` sang Pixhawk/server.
+
+Không mở `wifi_gps.py --direct /dev/ttyAMA0` cùng lúc với `main.py`. Mặc định file
+gửi vào loopback `127.0.0.1:14600`, và forwarder chỉ chấp nhận message
+`GPS_INPUT` trên cổng này.
+
+### Pixhawk 2.4.8 / ArduPilot và điều khiển từ server
+
+Pixhawk 2.4.8 dùng firmware target `Pixhawk1`. GPS_INPUT và MAVLink hai chiều được
+hỗ trợ, nhưng board 1 MB dùng firmware cắt giảm tính năng. Dùng đúng bản stable
+`Pixhawk1` do Mission Planner/firmware server cung cấp, không chọn `Pixhawk4`.
+
+Nếu CM5 nối vào TELEM2 (xác minh mapping trên board):
+
+```text
+SERIAL2_PROTOCOL = 2    # MAVLink2
+SERIAL2_BAUD     = 921  # khớp config serial_baud: 921600
+GPS1_TYPE        = 14   # chỉ khi dùng wifi_gps.py
+```
+
+TX/RX phải đấu chéo và chung GND; không cấp nguồn Pixhawk từ chân 5V của UART.
+Server UDP phải lắng nghe `45.117.171.237:14550`, trả downlink từ cùng IP/port về
+source UDP của CM5, và command phải target đúng `SYSID_THISMAV` (thường là 1).
+Forwarder gửi cả heartbeat thật của ArduPilot lên server và chuyển packet server
+về active Pixhawk connection.
+
+### Giảm độ trễ webcam USB
+
+Cấu hình CAM0 có nhận diện hiện là 1280×720, 30 fps, 2500 kbit/s, GOP 15, MJPEG
+input và x264 `zerolatency`. ArUco `DICT_4X4_50`, ID 5 được nhận diện trên ảnh
+320×240 rồi scale overlay lên stream chính. Detector không chạy trực tiếp ở
+1280×720 nên giảm được tải xử lý ảnh, nhưng encode stream chính vẫn nặng hơn
+640×480.
+
+Khi cả detection và overlay tắt, có thể bật `usb_direct_mode: true` để dùng đường
+trực tiếp `V4L2 → FFmpeg → RTSP`, không copy raw frame qua Python. Đường trực tiếp
+không thể burn overlay marker; muốn nhìn marker trên video phải để
+`detection_enabled`, `overlay_enabled`, `overlay_burn_enabled` là `true` và
+`usb_direct_mode: false`.
+
+Ở phía xem, dùng WebRTC/WHEP (`:8889/.../whep`), không dùng HLS (`:8888`) nếu cần
+điều khiển thời gian thực. MediaMTX nên mở cổng UDP WebRTC 8189 và khai báo đúng
+public IP trong `webrtcAdditionalHosts`; TURN/TCP chỉ dùng fallback vì thường trễ
+hơn đường UDP trực tiếp.
+
+### ArUco precision landing qua MAVLink
+
+Detector xuất offset theo pixel. Bridge chuyển pixel sang góc radian bằng FOV
+thật của webcam rồi phát `LANDING_TARGET` 10 Hz cho cả Pixhawk và server. Không
+bật bridge với FOV đoán. Đo vùng nhìn thấy ở khoảng cách `D`: nếu chiều rộng là
+`W`, `HFOV = 2*atan(W/(2*D))`; làm tương tự với chiều cao để có VFOV, rồi nhập độ:
+
+```yaml
+landing:
+  mavlink_enabled: true
+  mavlink_hz: 10
+  mavlink_camera_id: 0
+  camera_hfov_deg: 60.0  # thay bằng số đã đo
+  camera_vfov_deg: 45.0  # thay bằng số đã đo
+```
+
+Trên ArduPilot đặt `PLND_ENABLED=1`, reboot, sau đó `PLND_TYPE=1`. Đặt
+`PLND_YAW_ALIGN` đúng chiều lắp camera hướng xuống. Nên dùng rangefinder và kiểm
+tra offset khi DISARMED, rồi thử Precision Loiter ở độ cao thấp trước khi thử
+LAND/RTL. Cấu hình mặc định để `mavlink_enabled: false` cho tới khi FOV và chiều
+lắp camera đã được xác nhận.
 
 ### Xử lý sự cố thường gặp
 

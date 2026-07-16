@@ -1,0 +1,6 @@
+pyproject.toml
+setup.py
+uavlink_apt_bootstrap.egg-info/PKG-INFO
+uavlink_apt_bootstrap.egg-info/SOURCES.txt
+uavlink_apt_bootstrap.egg-info/dependency_links.txt
+uavlink_apt_bootstrap.egg-info/top_level.txt

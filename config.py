@@ -64,5 +64,7 @@ class Config:
             "mode": self.network.get("mode", "prefer_4g"),
             "cloud_wifi_fallback": self.network.get("cloud_wifi_fallback", True),
             "forward_gps_raw_int": self.network.get("forward_gps_raw_int", True),
+            "forward_all_mavlink": self.network.get("forward_all_mavlink", False),
+            "wifi_gps_relay_to_server": self.network.get("wifi_gps_relay_to_server", False),
             "fallback_delay": self.network.get("fallback_delay", 300),
         }

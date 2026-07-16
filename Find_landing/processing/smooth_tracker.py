@@ -127,15 +127,12 @@ class SmoothTracker:
                     # Hold chỉ giữ tâm target — không ghost toàn bộ marker trên bảng.
                     held.pop("aruco_markers_by_id", None)
                     held.pop("aruco_markers", None)
+                    held.pop("aruco_instances", None)
                     held["aruco_marker_count"] = 1
                     return held
             self._reset()
-            out: dict[str, Any] = {"detected": False}
-            if raw.get("aruco_visible_ids"):
-                out["aruco_visible_ids"] = raw["aruco_visible_ids"]
-                out["aruco_marker_count"] = raw.get("aruco_marker_count", len(raw["aruco_visible_ids"]))
-            if raw.get("searching_id") is not None:
-                out["searching_id"] = raw["searching_id"]
+            out: dict[str, Any] = copy.deepcopy(raw)
+            out["detected"] = False
             return out
 
         self._last_confirmed_at = now
@@ -163,10 +160,12 @@ class SmoothTracker:
         self._corners_f = _ema_corners(self._corners_f, raw_corners, alpha)
 
         raw_by_id = raw.get("aruco_markers_by_id") or {}
+        next_markers_by_id: dict[int, list[tuple[float, float]]] = {}
         for mid, corners in raw_by_id.items():
             key = int(mid)
             prev = self._markers_by_id_f.get(key)
-            self._markers_by_id_f[key] = _ema_corners(prev, corners, alpha)
+            next_markers_by_id[key] = _ema_corners(prev, corners, alpha)
+        self._markers_by_id_f = next_markers_by_id
 
         sx, sy = _round_point(self._pos_f)
         sw, sh = _round_point(self._size_f) if self._size_f else (int(bw), int(bh))
@@ -209,3 +208,7 @@ class SmoothTracker:
         self._markers_by_id_f = {}
         self._direction = "CENTER"
         self._last_confirmed_at = None
+
+    def reset(self) -> None:
+        """Public reset used when target identity becomes ambiguous."""
+        self._reset()

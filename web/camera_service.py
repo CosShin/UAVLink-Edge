@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 from paths import find_landing_path, project_path
+from web.camera_probe import probe_usb_cameras
 
 logger = logging.getLogger("CameraAPI")
 
@@ -49,28 +50,32 @@ def _stream_config_path(camera_id: int) -> Path:
     return _find_landing() / f"camera_config_{camera_id}.json"
 
 
-def _streamer_python() -> str:
-    """Picamera2 on Pi is apt-only — always prefer system python3 (Pi_CM5 behaviour)."""
+def _streamer_python(source: str = "csi") -> str:
+    """Choose an interpreter containing the capture dependency for this source."""
     candidates: List[str] = []
-    for exe in ("/usr/bin/python3", "python3", sys.executable):
+    source = str(source or "csi").lower()
+    module = "cv2" if source == "usb" else "picamera2"
+    preferred = (sys.executable, "/usr/bin/python3", "python3") if source == "usb" else (
+        "/usr/bin/python3", "python3", sys.executable
+    )
+    for exe in preferred:
         if exe and exe not in candidates:
             candidates.append(exe)
     for exe in candidates:
         try:
             probe = subprocess.run(
-                [exe, "-c", "import picamera2"],
+                [exe, "-c", f"import {module}"],
                 capture_output=True,
                 timeout=20,
             )
             if probe.returncode == 0:
-                logger.info("[CAMERA] Streamer interpreter: %s", exe)
+                logger.info("[CAMERA] Streamer interpreter (%s): %s", source, exe)
                 return exe
         except (OSError, subprocess.TimeoutExpired):
             continue
-    logger.warning(
-        "[CAMERA] picamera2 không có — stream sẽ lỗi. Chạy: sudo apt install -y python3-picamera2"
-    )
-    return "/usr/bin/python3" if Path("/usr/bin/python3").is_file() else sys.executable
+    package = "python3-opencv" if source == "usb" else "python3-picamera2"
+    logger.warning("[CAMERA] %s không có — chạy: sudo apt install -y %s", module, package)
+    return sys.executable
 
 
 def _default_detected() -> dict:
@@ -231,9 +236,15 @@ def camera_detect(refresh: bool = False) -> tuple:
         _save_detected(saved)
 
     result = _build_detect_result(saved, connected, reg)
+    usb_cameras, usb_err = probe_usb_cameras()
+    result["usb_cameras"] = usb_cameras
+    result["usb_connected_count"] = len(usb_cameras)
+    result["total_connected_count"] = len(connected) + len(usb_cameras)
     result["cached"] = not refresh
     if scan_err:
         result["message"] = scan_err
+    if usb_err:
+        result["usb_message"] = usb_err
     return result, 200
 
 
@@ -260,6 +271,8 @@ def _ensure_default_streams(cfg) -> None:
         {
             "name": "cam0",
             "camera_id": 0,
+            "source": "csi",
+            "device_path": "",
             "enabled": True,
             "size": [640, 480],
             "framerate": 30,
@@ -277,6 +290,8 @@ def _ensure_default_streams(cfg) -> None:
         {
             "name": "cam1",
             "camera_id": 1,
+            "source": "csi",
+            "device_path": "",
             "enabled": True,
             "size": [640, 480],
             "framerate": 30,
@@ -330,6 +345,8 @@ def _find_stream(cfg, camera_id: int) -> tuple:
     default = {
         "name": f"cam{camera_id}",
         "camera_id": camera_id,
+        "source": "csi",
+        "device_path": "",
         "enabled": True,
         "size": [640, 480],
         "framerate": 30,
@@ -371,6 +388,11 @@ def _streamer_json_payload(
     size = stream.get("size") or [640, 480]
     return {
         "camera_id": cam_id,
+        "source": str(stream.get("source") or "csi").lower(),
+        "device_path": str(stream.get("device_path") or stream.get("camera_device") or ""),
+        "usb_input_format": str(stream.get("usb_input_format") or "auto").lower(),
+        "usb_direct_mode": bool(stream.get("usb_direct_mode", True)),
+        "rtsp_transport": str(stream.get("rtsp_transport") or "tcp").lower(),
         "size": size,
         "framerate": int(stream.get("framerate", 30)),
         "format": stream.get("format", "BGR888"),
@@ -392,6 +414,20 @@ def _streamer_json_payload(
         "landing_detection_mode": str(stream.get("landing_detection_mode") or "contour_h"),
         "aruco_marker_id": int(stream.get("aruco_marker_id", 0) or 0),
         "aruco_dictionary": str(stream.get("aruco_dictionary") or "DICT_4X4_50"),
+        "aruco_target_strategy": str(stream.get("aruco_target_strategy") or "single"),
+        "aruco_board_first_id": int(stream.get("aruco_board_first_id", 0) or 0),
+        "aruco_board_cols": int(stream.get("aruco_board_cols", 3) or 3),
+        "aruco_board_rows": int(stream.get("aruco_board_rows", 4) or 4),
+        "aruco_board_gap_x_ratio": float(stream.get("aruco_board_gap_x_ratio", 0.16) or 0.16),
+        "aruco_board_gap_y_ratio": float(stream.get("aruco_board_gap_y_ratio", 0.34) or 0.34),
+        "aruco_board_ransac_threshold_px": float(stream.get("aruco_board_ransac_threshold_px", 3.0) or 3.0),
+        "aruco_board_min_markers": int(stream.get("aruco_board_min_markers", 2) or 2),
+        "aruco_board_close_single_marker_area_ratio": float(stream.get("aruco_board_close_single_marker_area_ratio", 0.08) or 0.0),
+        "aruco_reacquire_detect_width": int(stream.get("aruco_reacquire_detect_width", 960) or 0),
+        "aruco_marker_length_m": float(stream.get("aruco_marker_length_m", 0.0) or 0.0),
+        "aruco_calibration_file": str(stream.get("aruco_calibration_file") or ""),
+        "aruco_min_quality": float(stream.get("aruco_min_quality", 0.55) or 0.55),
+        "aruco_acquire_frames": int(stream.get("aruco_acquire_frames", 5) or 5),
         "lores_size": _cv_lores_size(stream),
         "multi_camera": multi_camera,
         "keyframe_interval": int(stream.get("keyframe_interval", 30)),
@@ -413,6 +449,11 @@ def camera_config_to_ui(cfg, camera_id: int) -> dict:
     return {
         "camera_id": camera_id,
         "name": stream.get("name", f"cam{camera_id}"),
+        "source": str(stream.get("source") or "csi").lower(),
+        "device_path": str(stream.get("device_path") or stream.get("camera_device") or ""),
+        "usb_input_format": str(stream.get("usb_input_format") or "auto").lower(),
+        "usb_direct_mode": bool(stream.get("usb_direct_mode", True)),
+        "rtsp_transport": str(stream.get("rtsp_transport") or "tcp").lower(),
         "enabled": stream.get("enabled", True),
         "size": size,
         "framerate": int(stream.get("framerate", 30)),
@@ -435,6 +476,20 @@ def camera_config_to_ui(cfg, camera_id: int) -> dict:
         "landing_detection_mode": str(stream.get("landing_detection_mode") or "contour_h"),
         "aruco_marker_id": int(stream.get("aruco_marker_id", 0) or 0),
         "aruco_dictionary": str(stream.get("aruco_dictionary") or "DICT_4X4_50"),
+        "aruco_target_strategy": str(stream.get("aruco_target_strategy") or "single"),
+        "aruco_board_first_id": int(stream.get("aruco_board_first_id", 0) or 0),
+        "aruco_board_cols": int(stream.get("aruco_board_cols", 3) or 3),
+        "aruco_board_rows": int(stream.get("aruco_board_rows", 4) or 4),
+        "aruco_board_gap_x_ratio": float(stream.get("aruco_board_gap_x_ratio", 0.16) or 0.16),
+        "aruco_board_gap_y_ratio": float(stream.get("aruco_board_gap_y_ratio", 0.34) or 0.34),
+        "aruco_board_ransac_threshold_px": float(stream.get("aruco_board_ransac_threshold_px", 3.0) or 3.0),
+        "aruco_board_min_markers": int(stream.get("aruco_board_min_markers", 2) or 2),
+        "aruco_board_close_single_marker_area_ratio": float(stream.get("aruco_board_close_single_marker_area_ratio", 0.08) or 0.0),
+        "aruco_reacquire_detect_width": int(stream.get("aruco_reacquire_detect_width", 960) or 0),
+        "aruco_marker_length_m": float(stream.get("aruco_marker_length_m", 0.0) or 0.0),
+        "aruco_calibration_file": str(stream.get("aruco_calibration_file") or ""),
+        "aruco_min_quality": float(stream.get("aruco_min_quality", 0.55) or 0.55),
+        "aruco_acquire_frames": int(stream.get("aruco_acquire_frames", 5) or 5),
         "lores_size": _cv_lores_size(stream),
         "keyframe_interval": int(stream.get("keyframe_interval", 30)),
         "preset": stream.get("preset", "ultrafast"),
@@ -456,6 +511,8 @@ def camera_streams_summary(cfg) -> List[dict]:
             {
                 "camera_id": stream.get("camera_id"),
                 "name": stream.get("name"),
+                "source": str(stream.get("source") or "csi").lower(),
+                "device_path": str(stream.get("device_path") or stream.get("camera_device") or ""),
                 "enabled": stream.get("enabled", True),
                 "size": size,
                 "format": stream.get("format", "RGB888"),
@@ -477,6 +534,8 @@ def stream_endpoints(cfg) -> List[dict]:
             {
                 "camera_id": cam_id,
                 "name": stream.get("name", f"cam{cam_id}"),
+                "source": str(stream.get("source") or "csi").lower(),
+                "device_path": str(stream.get("device_path") or stream.get("camera_device") or ""),
                 "publish_path": pub,
                 "rtsp": f"rtsp://{m['host']}:{m['rtsp_port']}{pub}",
                 "webrtc_whep": f"http://{m['host']}:{m['webrtc_port']}{pub}/whep",
@@ -532,13 +591,35 @@ def save_camera_stream_from_ui(cfg, incoming: dict) -> None:
     for key in ("detection_enabled", "overlay_enabled", "overlay_burn_enabled"):
         if key in incoming:
             stream[key] = bool(incoming[key])
-    for key in ("preset", "tune", "landing_detection_mode", "aruco_dictionary"):
+    if "source" in incoming:
+        source = str(incoming["source"] or "csi").lower()
+        if source not in ("csi", "usb"):
+            raise ValueError("Camera source phải là csi hoặc usb")
+        stream["source"] = source
+    for key in ("preset", "tune", "landing_detection_mode", "aruco_dictionary", "aruco_target_strategy", "aruco_calibration_file"):
         if key in incoming:
             stream[key] = incoming[key]
-    for key in ("gate_timeout_ms", "detect_frame_skip", "overlay_frame_skip", "aruco_marker_id", "detection_lost_hold_ms", "detection_reacquire_ms"):
+    if "usb_input_format" in incoming:
+        usb_input_format = str(incoming["usb_input_format"] or "auto").lower()
+        if usb_input_format not in ("auto", "mjpeg", "mjpg", "yuyv", "yuy2"):
+            raise ValueError("USB input format phải là auto, mjpeg hoặc yuyv")
+        stream["usb_input_format"] = usb_input_format
+    if "usb_direct_mode" in incoming:
+        stream["usb_direct_mode"] = bool(incoming["usb_direct_mode"])
+    if "rtsp_transport" in incoming:
+        transport = str(incoming["rtsp_transport"] or "tcp").lower()
+        if transport not in ("tcp", "udp"):
+            raise ValueError("RTSP transport phải là tcp hoặc udp")
+        stream["rtsp_transport"] = transport
+    if "device_path" in incoming:
+        device_path = str(incoming["device_path"] or "").strip()
+        if device_path and not re.fullmatch(r"/dev/video\d+", device_path):
+            raise ValueError("USB device phải có dạng /dev/videoN")
+        stream["device_path"] = device_path
+    for key in ("gate_timeout_ms", "detect_frame_skip", "overlay_frame_skip", "aruco_marker_id", "detection_lost_hold_ms", "detection_reacquire_ms", "aruco_board_first_id", "aruco_board_cols", "aruco_board_rows", "aruco_board_min_markers", "aruco_acquire_frames", "aruco_reacquire_detect_width"):
         if key in incoming:
             stream[key] = int(incoming[key])
-    for key in ("sharpness", "saturation"):
+    for key in ("sharpness", "saturation", "aruco_board_gap_x_ratio", "aruco_board_gap_y_ratio", "aruco_board_ransac_threshold_px", "aruco_marker_length_m", "aruco_min_quality", "aruco_board_close_single_marker_area_ratio"):
         if key in incoming:
             stream[key] = float(incoming[key])
     if "lores_size" in incoming and isinstance(incoming["lores_size"], (list, tuple)):
@@ -600,7 +681,6 @@ def camera_restart(cfg) -> tuple:
         if not script.exists():
             return {"success": False, "message": "camera_streamer.py not found"}, 503
 
-        py = _streamer_python()
         started = []
         for i, cfg_path in enumerate(sorted(paths)):
             if i > 0:
@@ -608,6 +688,12 @@ def camera_restart(cfg) -> tuple:
             base = Path(cfg_path).name
             match = re.search(r"(\d+)", base)
             cam_id = int(match.group(1)) if match else i
+            try:
+                stream_payload = json.loads(Path(cfg_path).read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                stream_payload = {}
+            source = str(stream_payload.get("source") or "csi").lower()
+            py = _streamer_python(source)
             env = os.environ.copy()
             if len(paths) > 1:
                 env["DRONEBRIDGE_MULTI_CAMERA"] = "1"
@@ -616,7 +702,15 @@ def camera_restart(cfg) -> tuple:
                 cwd=str(_find_landing()),
                 env=env,
             )
-            started.append({"camera_id": cam_id, "proc": proc, "config": base})
+            started.append(
+                {
+                    "camera_id": cam_id,
+                    "source": source,
+                    "device_path": str(stream_payload.get("device_path") or ""),
+                    "proc": proc,
+                    "config": base,
+                }
+            )
             logger.info("[CAMERA] Streamer cam%s started (PID %s, %s)", cam_id, proc.pid, py)
 
         _manager_procs.extend(started)
@@ -649,6 +743,8 @@ def camera_stream_status() -> List[dict]:
             out.append(
                 {
                     "camera_id": item.get("camera_id"),
+                    "source": item.get("source", "csi"),
+                    "device_path": item.get("device_path", ""),
                     "running": alive,
                     "pid": proc.pid if alive and proc else 0,
                 }

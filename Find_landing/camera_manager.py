@@ -1,9 +1,8 @@
 import threading
 import time
-from picamera2 import Picamera2
-import numpy as np
 import cv2
 import glob
+import os
 import re
 
 from stream.wire_format import resolve_byte_order
@@ -43,7 +42,14 @@ class CameraManager:
                 new_fmt = str(config.get('format', '')).upper()
                 prev_size = tuple(prev.get('size', ()))
                 new_size = tuple(config.get('size', ()))
-                if prev_fmt and new_fmt and prev_fmt != new_fmt:
+                prev_source = str(prev.get('source') or 'csi').lower()
+                new_source = str(config.get('source') or 'csi').lower()
+                prev_device = str(prev.get('device_path') or '')
+                new_device = str(config.get('device_path') or '')
+                if prev_source != new_source or prev_device != new_device:
+                    print(f"Camera {camera_id}: source/device changed, reinit")
+                    self._release_camera_unlocked(camera_id)
+                elif prev_fmt and new_fmt and prev_fmt != new_fmt:
                     print(f"Camera {camera_id}: format {prev_fmt} → {new_fmt}, reinit")
                     self._release_camera_unlocked(camera_id)
                 elif prev_size and new_size and prev_size != new_size:
@@ -82,6 +88,10 @@ class CameraManager:
     def _initialize_camera(self, camera_id, config=None):
 
         try:
+            source = str((config or {}).get('source') or 'csi').lower()
+            if source == 'usb':
+                return self._initialize_usb_fallback(camera_id, config, strict_device=True)
+
             # Check if camera exists first
             from picamera2 import Picamera2
             available_cameras = Picamera2.global_camera_info()
@@ -323,7 +333,19 @@ class CameraManager:
 
         return sorted(nodes, key=sort_key)
 
-    def _initialize_usb_fallback(self, camera_id, config=None):
+    def _usb_video_nodes(self):
+        """Return V4L2 nodes whose sysfs parent belongs to the USB bus."""
+        nodes = []
+        for node in self._sorted_video_nodes():
+            sysfs_device = f"/sys/class/video4linux/{os.path.basename(node)}/device"
+            try:
+                if 'usb' in os.path.realpath(sysfs_device).lower():
+                    nodes.append(node)
+            except OSError:
+                continue
+        return nodes
+
+    def _initialize_usb_fallback(self, camera_id, config=None, strict_device=False):
         device_path = None
         if config and isinstance(config, dict):
             device_path = config.get('device_path') or config.get('camera_device')
@@ -332,18 +354,28 @@ class CameraManager:
         if device_path:
             candidates.append(device_path)
 
-        nodes = self._sorted_video_nodes()
-        high_nodes = [n for n in nodes if int(re.search(r'(\d+)$', n).group(1)) >= 8]
-        low_nodes = [n for n in nodes if int(re.search(r'(\d+)$', n).group(1)) < 8]
-        for node in high_nodes + low_nodes:
-            if node not in candidates:
-                candidates.append(node)
+        # Explicit USB config must not silently switch to a CSI/codec node or a
+        # second webcam when the selected device is unplugged.
+        if not device_path:
+            # An explicit USB source may only auto-select a real USB bus node.
+            # Raspberry Pi exposes CSI/ISP/codec nodes under /dev/video* too.
+            candidates.extend(self._usb_video_nodes())
+        elif not strict_device:
+            usb_nodes = self._usb_video_nodes()
+            nodes = self._sorted_video_nodes()
+            high_nodes = [n for n in nodes if int(re.search(r'(\d+)$', n).group(1)) >= 8]
+            low_nodes = [n for n in nodes if int(re.search(r'(\d+)$', n).group(1)) < 8]
+            for node in usb_nodes + high_nodes + low_nodes:
+                if node not in candidates:
+                    candidates.append(node)
 
         width, height = (640, 480)
         if config and isinstance(config, dict):
             sz = config.get('size')
             if isinstance(sz, (tuple, list)) and len(sz) == 2:
                 width, height = int(sz[0]), int(sz[1])
+        fps = int((config or {}).get('framerate', 30) or 30)
+        input_format = str((config or {}).get('usb_input_format') or 'auto').lower()
 
         for node in candidates:
             cap = cv2.VideoCapture(node, cv2.CAP_V4L2)
@@ -351,8 +383,14 @@ class CameraManager:
                 cap.release()
                 continue
 
+            if input_format in ('mjpeg', 'mjpg'):
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+            elif input_format in ('yuyv', 'yuy2'):
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            cap.set(cv2.CAP_PROP_FPS, fps)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             ok, frame = cap.read()
             if not ok or frame is None:
@@ -362,11 +400,21 @@ class CameraManager:
             print(f"✓ USB fallback camera initialized on {node} (requested camera_id={camera_id})")
             usb_cfg = dict(config or {})
             usb_cfg['actual_format'] = 'BGR888'
+            usb_cfg['size'] = (width, height)
+            usb_cfg['device_path'] = node
+            usb_cfg['actual_capture_size'] = (
+                int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or frame.shape[1]),
+                int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or frame.shape[0]),
+            )
+            usb_cfg['actual_fps'] = float(cap.get(cv2.CAP_PROP_FPS) or 0)
             self.camera_configs[camera_id] = usb_cfg
             return {
                 'backend': 'cv2',
                 'cap': cap,
                 'device': node,
+                'size': (width, height),
+                'fps': fps,
+                'read_failures': 0,
             }
 
         print(f"✗ USB fallback failed for camera {camera_id}")
@@ -388,7 +436,12 @@ class CameraManager:
                             return None
                         ok, frame = cap.read()
                         if not ok or frame is None:
+                            camera['read_failures'] = int(camera.get('read_failures', 0)) + 1
                             return None
+                        camera['read_failures'] = 0
+                        target_w, target_h = camera.get('size') or (frame.shape[1], frame.shape[0])
+                        if frame.shape[1] != target_w or frame.shape[0] != target_h:
+                            frame = cv2.resize(frame, (int(target_w), int(target_h)))
                         # OpenCV V4L2 returns BGR — keep native order.
                         return frame
 

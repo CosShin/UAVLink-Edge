@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import glob
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -158,6 +159,79 @@ def _probe_v4l2_devices() -> Tuple[List[Dict[str, Any]], Optional[str]]:
     if cameras:
         return cameras, None
     return [], output.strip() or "v4l2-ctl: no devices"
+
+
+def _v4l2_device_info(ctl: str, node: str) -> str:
+    try:
+        result = subprocess.run(
+            [ctl, "--device", node, "--info"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return ""
+    return (result.stdout or "") + "\n" + (result.stderr or "")
+
+
+def _sysfs_video_name(node: str) -> str:
+    name_path = Path("/sys/class/video4linux") / Path(node).name / "name"
+    try:
+        return name_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return Path(node).name
+
+
+def _is_usb_sysfs_node(node: str) -> bool:
+    device_path = Path("/sys/class/video4linux") / Path(node).name / "device"
+    try:
+        return "usb" in os.path.realpath(device_path).lower()
+    except OSError:
+        return False
+
+
+def probe_usb_cameras() -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """Return only USB V4L2 capture nodes, without opening an active stream.
+
+    One webcam can expose multiple nodes (video + metadata).  ``v4l2-ctl
+    --info`` lets us keep actual Video Capture nodes and ignore codec/ISP nodes.
+    Sysfs is used as a fallback when v4l2-ctl is not installed.
+    """
+    nodes = _sorted_video_nodes()
+    if not nodes:
+        return [], "Không có /dev/video*"
+
+    ctl = shutil.which("v4l2-ctl")
+    cameras: List[Dict[str, Any]] = []
+    for node in nodes:
+        info = _v4l2_device_info(ctl, node) if ctl else ""
+        info_lower = info.lower()
+        sysfs_usb = _is_usb_sysfs_node(node)
+        is_usb = sysfs_usb or "bus info" in info_lower and "usb" in info_lower
+        if not is_usb:
+            continue
+
+        # Metadata-only nodes cannot provide image frames.
+        if info and "video capture" not in info_lower:
+            continue
+
+        name = _sysfs_video_name(node)
+        cameras.append(
+            {
+                "id": len(cameras),
+                "info": f"{name} ({node})",
+                "name": name,
+                "backend": "v4l2",
+                "source": "usb",
+                "device": node,
+            }
+        )
+
+    if cameras:
+        return cameras, None
+    if not ctl:
+        return [], "Không tìm thấy webcam USB trong sysfs (v4l2-ctl chưa cài)"
+    return [], "Không tìm thấy USB Video Capture device"
 
 
 def probe_cameras() -> Dict[str, Any]:

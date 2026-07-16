@@ -8,6 +8,7 @@ APT_PACKAGES = [
     "wireguard-tools",
     "python3-picamera2",
     "python3-libcamera",
+    "python3-opencv",
     "libcamera-apps",
     "v4l-utils",
     "ffmpeg",

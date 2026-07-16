@@ -98,7 +98,12 @@ def main() -> int:
                     bgr = sensor_frame_to_bgr(frame, byte_order)
                     processing.submit(fid, bgr)
             det = processing.latest_detection()
-            write_landing_telemetry(camera_id, det, processing.detections_count)
+            write_landing_telemetry(
+                camera_id,
+                det,
+                processing.detections_count,
+                frame_size=config.get("size"),
+            )
             fid += 1
     finally:
         processing.stop()

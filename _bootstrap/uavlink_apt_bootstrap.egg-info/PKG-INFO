@@ -1,0 +1,4 @@
+Metadata-Version: 2.4
+Name: uavlink-apt-bootstrap
+Version: 1.0.0
+Summary: Runs apt install before pip packages (internal bootstrap)
