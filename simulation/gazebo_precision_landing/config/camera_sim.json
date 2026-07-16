@@ -1,0 +1,28 @@
+{
+  "camera_id": 0,
+  "size": [1280, 720],
+  "framerate": 30,
+  "detection_enabled": true,
+  "landing_detection_mode": "aruco",
+  "detect_frame_skip": 1,
+  "detection_lost_hold_ms": 0,
+  "detection_reacquire_ms": 500,
+  "aruco_dictionary": "DICT_4X4_50",
+  "aruco_marker_id": 5,
+  "aruco_target_strategy": "board",
+  "aruco_board_first_id": 0,
+  "aruco_board_cols": 3,
+  "aruco_board_rows": 4,
+  "aruco_board_gap_x_ratio": 0.16,
+  "aruco_board_gap_y_ratio": 0.34,
+  "aruco_board_ransac_threshold_px": 3.0,
+  "aruco_board_min_markers": 2,
+  "aruco_board_close_single_marker_area_ratio": 0.08,
+  "aruco_reacquire_detect_width": 960,
+  "aruco_marker_length_m": 0.20,
+  "aruco_calibration_file": "",
+  "aruco_min_quality": 0.55,
+  "aruco_acquire_frames": 5,
+  "lores_size": [640, 360]
+}
+
