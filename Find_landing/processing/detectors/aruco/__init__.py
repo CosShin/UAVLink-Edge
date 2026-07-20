@@ -42,6 +42,7 @@ def create_processor(config: dict, find_landing_dir: str, prepared=None):
         calibration_file=str(config.get("aruco_calibration_file", "") or ""),
         min_quality=float(config.get("aruco_min_quality", 0.55) or 0.55),
         acquire_frames=int(config.get("aruco_acquire_frames", 5) or 5),
+        ema_alpha=float(config.get("aruco_ema_alpha", 0.28) or 0.28),
     )
 
 

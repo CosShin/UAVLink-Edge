@@ -38,6 +38,7 @@ class ArucoProcessor(FrameProcessor):
         calibration_file: str = "",
         min_quality: float = 0.55,
         acquire_frames: int = 5,
+        ema_alpha: float = 0.28,
     ):
         self.enabled = enabled
         self.frame_skip = max(int(frame_skip), 1)
@@ -64,7 +65,10 @@ class ArucoProcessor(FrameProcessor):
         self.marker_length_m = max(0.0, float(marker_length_m))
         self._reacquire_sec = max(int(reacquire_ms), 0) / 1000.0
         self._boost_until = 0.0
-        self._stable = StableTracker(lost_hold_ms=lost_hold_ms)
+        self._stable = StableTracker(
+            lost_hold_ms=lost_hold_ms,
+            ema_alpha=max(0.05, min(1.0, float(ema_alpha))),
+        )
         self._tracking = TargetTrackState(
             min_quality=min_quality,
             acquire_frames=acquire_frames,

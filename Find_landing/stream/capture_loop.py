@@ -39,7 +39,14 @@ def run_capture_loop(streamer, pipe_write_fd: int):
         f"wire={wire_pixel_format(config)})"
     )
 
-    processing = build_pipeline(config, find_landing_dir, streamer.running)
+    processing = build_pipeline(
+        config,
+        find_landing_dir,
+        streamer.running,
+        # USB frames burn the latest detection directly onto the current frame.
+        # Avoid producing and retaining a stale full-frame overlay in the worker.
+        overlay_processor=not bool(config.get("detection_enabled", True)),
+    )
     if processing:
         processing.start()
         print(" Processing pipeline started (Hướng 2)")

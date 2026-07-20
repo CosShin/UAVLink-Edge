@@ -428,6 +428,7 @@ def _streamer_json_payload(
         "aruco_calibration_file": str(stream.get("aruco_calibration_file") or ""),
         "aruco_min_quality": float(stream.get("aruco_min_quality", 0.55) or 0.55),
         "aruco_acquire_frames": int(stream.get("aruco_acquire_frames", 5) or 5),
+        "aruco_ema_alpha": float(stream.get("aruco_ema_alpha", 0.28) or 0.28),
         "lores_size": _cv_lores_size(stream),
         "multi_camera": multi_camera,
         "keyframe_interval": int(stream.get("keyframe_interval", 30)),
@@ -490,6 +491,7 @@ def camera_config_to_ui(cfg, camera_id: int) -> dict:
         "aruco_calibration_file": str(stream.get("aruco_calibration_file") or ""),
         "aruco_min_quality": float(stream.get("aruco_min_quality", 0.55) or 0.55),
         "aruco_acquire_frames": int(stream.get("aruco_acquire_frames", 5) or 5),
+        "aruco_ema_alpha": float(stream.get("aruco_ema_alpha", 0.28) or 0.28),
         "lores_size": _cv_lores_size(stream),
         "keyframe_interval": int(stream.get("keyframe_interval", 30)),
         "preset": stream.get("preset", "ultrafast"),
@@ -619,7 +621,7 @@ def save_camera_stream_from_ui(cfg, incoming: dict) -> None:
     for key in ("gate_timeout_ms", "detect_frame_skip", "overlay_frame_skip", "aruco_marker_id", "detection_lost_hold_ms", "detection_reacquire_ms", "aruco_board_first_id", "aruco_board_cols", "aruco_board_rows", "aruco_board_min_markers", "aruco_acquire_frames", "aruco_reacquire_detect_width"):
         if key in incoming:
             stream[key] = int(incoming[key])
-    for key in ("sharpness", "saturation", "aruco_board_gap_x_ratio", "aruco_board_gap_y_ratio", "aruco_board_ransac_threshold_px", "aruco_marker_length_m", "aruco_min_quality", "aruco_board_close_single_marker_area_ratio"):
+    for key in ("sharpness", "saturation", "aruco_board_gap_x_ratio", "aruco_board_gap_y_ratio", "aruco_board_ransac_threshold_px", "aruco_marker_length_m", "aruco_min_quality", "aruco_board_close_single_marker_area_ratio", "aruco_ema_alpha"):
         if key in incoming:
             stream[key] = float(incoming[key])
     if "lores_size" in incoming and isinstance(incoming["lores_size"], (list, tuple)):

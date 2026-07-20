@@ -130,9 +130,14 @@ class ProcessingPipeline:
         if not self._overlay_enabled:
             return frame_bgr
         with self._lock:
-            latest = self._latest
-        if latest is not None and latest.overlay_frame is not None:
-            return latest.overlay_frame
+            detection = dict(self._latest_detection)
+        if detection:
+            # Draw the newest coordinates on the current camera frame. Returning
+            # latest.overlay_frame here replayed an older full frame until the
+            # detector finished again, which made USB video and guidance lag.
+            from processing.overlay import draw_overlay
+
+            return draw_overlay(frame_bgr, detection, True)
         return frame_bgr
 
     def wait_and_resolve(self, frame_id: int, frame_bgr: np.ndarray, timeout_sec: float) -> np.ndarray:

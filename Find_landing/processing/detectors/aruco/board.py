@@ -86,6 +86,68 @@ def single_marker_quality(marker: dict, image_size: tuple[int, int]) -> tuple[fl
     }
 
 
+def estimate_single_marker_pose(
+    marker: dict,
+    image_size: tuple[int, int],
+    *,
+    calibration: dict | None,
+    output_size: tuple[int, int] | None,
+    marker_length_m: float,
+) -> dict | None:
+    """Estimate metric camera-to-marker pose from one calibrated square marker."""
+    if not calibration or not output_size or marker_length_m <= 0:
+        return None
+
+    width, height = image_size
+    out_w, out_h = output_size
+    if width <= 0 or height <= 0 or out_w <= 0 or out_h <= 0:
+        return None
+
+    half = float(marker_length_m) / 2.0
+    object_points = np.asarray(
+        [
+            [-half, half, 0.0],
+            [half, half, 0.0],
+            [half, -half, 0.0],
+            [-half, -half, 0.0],
+        ],
+        dtype=np.float32,
+    )
+    scale = np.asarray([out_w / width, out_h / height], dtype=np.float32)
+    image_points = (
+        np.asarray(marker["corners"], dtype=np.float32).reshape(4, 2) * scale
+    )
+    camera_matrix = calibration["camera_matrix"]
+    dist_coeffs = calibration["dist_coeffs"]
+    ok, rvec, tvec = cv2.solvePnP(
+        object_points,
+        image_points,
+        camera_matrix,
+        dist_coeffs,
+        flags=cv2.SOLVEPNP_IPPE_SQUARE,
+    )
+    if not ok or not np.all(np.isfinite(tvec)) or float(tvec[2, 0]) <= 0:
+        return None
+
+    projected, _ = cv2.projectPoints(
+        object_points, rvec, tvec, camera_matrix, dist_coeffs,
+    )
+    errors = np.linalg.norm(projected.reshape(-1, 2) - image_points, axis=1)
+    pose = [float(value) for value in tvec.reshape(3)]
+    return {
+        "pose_valid": True,
+        "pose_camera_m": pose,
+        "target_center_camera_m": pose,
+        "rvec": [float(value) for value in rvec.reshape(3)],
+        "pnp_reprojection_error_px": float(
+            math.sqrt(float(np.mean(np.square(errors))))
+        ),
+        "pnp_inliers": 4,
+        "camera_to_target_distance_m": float(np.linalg.norm(tvec)),
+        "camera_to_target_depth_m": float(tvec[2, 0]),
+    }
+
+
 def estimate_board(
     markers: list[dict],
     image_size: tuple[int, int],
@@ -195,6 +257,19 @@ def estimate_board(
         if ok:
             rep, _ = cv2.projectPoints(obj3, rvec, tvec, camera_matrix, dist_coeffs)
             pnp_err = np.linalg.norm(rep.reshape(-1, 2) - img_full, axis=1)
+            center_xy = board_center_model(
+                cols=cols,
+                rows=rows,
+                gap_x_ratio=gap_x_ratio,
+                gap_y_ratio=gap_y_ratio,
+                marker_length=float(marker_length_m),
+            ).reshape(2)
+            center_board = np.asarray(
+                [[float(center_xy[0])], [float(center_xy[1])], [0.0]],
+                dtype=np.float64,
+            )
+            rotation, _ = cv2.Rodrigues(rvec)
+            center_camera = rotation @ center_board + tvec
             result.update(
                 {
                     "pose_valid": True,
@@ -204,7 +279,11 @@ def estimate_board(
                         math.sqrt(float(np.mean(np.square(pnp_err))))
                     ),
                     "pnp_inliers": int(len(pnp_inliers)) if pnp_inliers is not None else 0,
+                    "target_center_camera_m": [
+                        float(value) for value in center_camera.reshape(3)
+                    ],
+                    "camera_to_target_distance_m": float(np.linalg.norm(center_camera)),
+                    "camera_to_target_depth_m": float(center_camera.reshape(3)[2]),
                 }
             )
     return result
-

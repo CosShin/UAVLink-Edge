@@ -48,6 +48,9 @@ def draw(frame, detection_result: dict):
             label += " [CLOSE-1]"
     else:
         label = f"ARUCO v3 ID={aid}"
+    distance_m = detection_result.get("camera_to_target_distance_m")
+    if distance_m is not None:
+        label += f" | D={float(distance_m):.2f}m"
     if detection_result.get("hold"):
         label += " [HOLD]"
 

@@ -5,7 +5,12 @@ from __future__ import annotations
 import numpy as np
 
 from .marker import BOARD_MARKER_COUNT
-from .board import duplicate_ids, estimate_board, single_marker_quality
+from .board import (
+    duplicate_ids,
+    estimate_board,
+    estimate_single_marker_pose,
+    single_marker_quality,
+)
 
 BOARD_ID_MAX = BOARD_MARKER_COUNT - 1
 
@@ -216,6 +221,7 @@ def detect_frame(
         marker_instances.append({"id": int(m["id"]), "corners": scaled})
         markers_by_id.setdefault(int(m["id"]), scaled)
 
+    single_pose = None
     if board_result is not None:
         quality = float(board_result["quality"])
         quality_details = {
@@ -226,6 +232,13 @@ def detect_frame(
     else:
         selected_marker = next(m for m in board_markers if int(m["id"]) == int(marker_id))
         quality, quality_details = single_marker_quality(selected_marker, (det_w, det_h))
+        single_pose = estimate_single_marker_pose(
+            selected_marker,
+            (det_w, det_h),
+            calibration=calibration,
+            output_size=output_size,
+            marker_length_m=marker_length_m,
+        )
 
     result = {
         "detected": True,
@@ -259,6 +272,7 @@ def detect_frame(
         "close_single_marker_fallback": bool(
             landing.get("close_single_marker_fallback", False)
         ),
+        "pose_valid": False,
         "in_circle": False,
     }
     if board_result is not None:
@@ -270,9 +284,19 @@ def detect_frame(
                 "pose_valid": bool(board_result.get("pose_valid")),
             }
         )
-        for key in ("pose_camera_m", "rvec", "pnp_reprojection_error_px", "pnp_inliers"):
+        for key in (
+            "pose_camera_m",
+            "rvec",
+            "pnp_reprojection_error_px",
+            "pnp_inliers",
+            "target_center_camera_m",
+            "camera_to_target_distance_m",
+            "camera_to_target_depth_m",
+        ):
             if key in board_result:
                 result[key] = board_result[key]
+    elif single_pose is not None:
+        result.update(single_pose)
     return result
 
 

@@ -26,5 +26,5 @@ psutil
 
 # Camera / landing (Find_landing: camera_streamer — picamera2 via apt python3-picamera2)
 numpy
-opencv-python-headless
+opencv-python
 # picamera2: cài qua apt (python3-picamera2), streamer dùng /usr/bin/python3 nếu venv thiếu

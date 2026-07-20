@@ -53,3 +53,28 @@ def put_text_line(frame, line_index: int, text: str, color, scale: float | None 
         FONT_THICKNESS,
         cv2.LINE_AA,
     )
+
+
+def put_top_centered_text_line(
+    frame,
+    line_index: int,
+    text: str,
+    color,
+    scale: float | None = None,
+) -> None:
+    """Vẽ một dòng trong cụm chữ ở phía trên, căn giữa theo chiều ngang."""
+    scale = FONT_SCALE_BODY if scale is None else scale
+    _fh, fw = frame.shape[:2]
+    (tw, th), _baseline = cv2.getTextSize(text, FONT, scale, FONT_THICKNESS)
+    x = max(0, (fw - tw) // 2)
+    y = TOP_MARGIN + th + line_index * LINE_HEIGHT
+    cv2.putText(
+        frame,
+        text,
+        (int(x), int(y)),
+        FONT,
+        scale,
+        color,
+        FONT_THICKNESS,
+        cv2.LINE_AA,
+    )

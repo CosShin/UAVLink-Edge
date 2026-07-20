@@ -1,12 +1,11 @@
-# Cập nhật webcam USB, GPS qua Wi-Fi và ArUco Precision Landing
+# Cập nhật webcam USB và ArUco Precision Landing
 
 Tài liệu này ghi lại các thay đổi đã thực hiện trong dự án UAVLink Edge Python,
 cấu hình hiện tại, cách chạy và quy trình kiểm thử với Raspberry Pi/CM5, webcam
 USB và Pixhawk 2.4.8 chạy ArduPilot.
 
-> Cảnh báo an toàn: các bước dùng GPS cố định chỉ dành cho kiểm tra trên bàn,
-> drone ở trạng thái DISARMED và đã tháo cánh/quạt. Không dùng tọa độ giả hoặc
-> vị trí Wi-Fi/IP làm nguồn định vị cho chuyến bay thật.
+> Cảnh báo an toàn: chỉ thử điều khiển khi drone ở trạng thái DISARMED và đã
+> tháo cánh/quạt. Không dùng tọa độ giả hoặc vị trí Wi-Fi/IP làm nguồn định vị.
 
 ## 1. Những phần đã cập nhật
 
@@ -68,49 +67,7 @@ Marker test hiện tại:
 Find_landing/templates/aruco_dict_4x4_50_id5.png
 ```
 
-### 1.3 GPS qua Wi-Fi
-
-Đã thêm file chạy độc lập:
-
-```text
-wifi_gps.py
-```
-
-Đường dữ liệu:
-
-```text
-Điện thoại/nguồn GPS
-  → JSON UDP tới IP của Pi, cổng 25100
-  → wifi_gps.py
-  → GPS_INPUT tại 127.0.0.1:14600
-  → main.py/forwarder
-  → Pixhawk
-  → GPS_RAW_INT
-  → server 45.117.171.237:14550
-```
-
-`127.0.0.1:14600` chỉ là chặng nội bộ giữa hai chương trình trên Pi, không phải
-web local và không phải đích cuối. Server cuối vẫn là
-`45.117.171.237:14550`.
-
-Các tính năng an toàn của `wifi_gps.py`:
-
-- Yêu cầu token khi nhận từ Wi-Fi, trừ khi chủ động cho phép không xác thực.
-- Kiểm tra lat/lon, độ cao và độ chính xác đầu vào.
-- Dừng phát GPS_INPUT nếu dữ liệu Wi-Fi cũ quá 2 giây.
-- Chế độ `--fixed` bắt buộc có `--bench-confirm`.
-- Cảnh báo nếu không phát hiện `main.py` tại localhost:8080.
-- In rõ chặng nội bộ và địa chỉ server cuối.
-
-Forwarder đã được cập nhật để:
-
-- Chỉ nhận `GPS_INPUT` từ loopback `127.0.0.1:14600`.
-- Chuyển GPS_INPUT vào đúng kết nối Pixhawk đang hoạt động.
-- Gửi `GPS_RAW_INT` của Pixhawk lên server.
-- Tự yêu cầu Pixhawk phát `GPS_RAW_INT` ở 2 Hz nếu chưa thấy stream GPS.
-- Chuyển gói điều khiển từ server về Pixhawk qua cùng kết nối MAVLink.
-
-### 1.4 ArUco và LANDING_TARGET
+### 1.3 ArUco và LANDING_TARGET
 
 Đã sửa các vấn đề sau:
 
@@ -157,21 +114,6 @@ SERIAL2_BAUD     = 921
 `SERIAL2_BAUD=921` tương ứng 921600 baud trong `config.yaml`. Nếu dùng TELEM1
 hoặc cổng khác, phải đổi đúng số `SERIALx`.
 
-Để ArduPilot nhận `GPS_INPUT`:
-
-```text
-GPS1_TYPE = 14
-```
-
-Firmware cũ có thể dùng tên:
-
-```text
-GPS_TYPE = 14
-```
-
-Sau khi đổi GPS type phải reboot Pixhawk. Khi muốn dùng lại GPS vật lý, trả tham
-số này về giá trị ban đầu/Auto.
-
 Kết nối UART:
 
 - TX của Pi nối RX của Pixhawk.
@@ -201,29 +143,6 @@ Camera streaming started
 
 Sau mỗi lần sửa `config.yaml`, hãy dừng chương trình cũ bằng Ctrl+C rồi chạy lại
 `./run.sh`.
-
-### Terminal 2: chạy GPS qua Wi-Fi
-
-Nhận GPS JSON từ điện thoại/thiết bị khác:
-
-```bash
-cd ~/test/tess2/UAVLink-Edge-Python
-WIFI_GPS_TOKEN='thay-bang-token-rieng' ./wifi_gps.py
-```
-
-Khi chưa nhận tọa độ, terminal chỉ hiện:
-
-```text
-Nhận GPS JSON tại udp://0.0.0.0:25100
-GPS_INPUT → udpout:127.0.0.1:14600
-```
-
-Hai dòng trên chưa có nghĩa là GPS đã hoạt động. Khi có nguồn GPS hợp lệ phải
-thấy định kỳ:
-
-```text
-GPS OK lat=... lon=... alt=... fix=3 injected=...
-```
 
 ## 4. Kiểm thử từng phần
 
@@ -256,69 +175,7 @@ Nếu video trễ nhiều:
 5. Chỉ khi không cần marker overlay mới tắt detection/overlay và bật
    `usb_direct_mode: true`.
 
-### 4.2 Test GPS cố định trên bàn
-
-Tháo cánh/quạt, để drone DISARMED và chạy:
-
-```bash
-./wifi_gps.py --fixed 21.0285,105.8542,10 --bench-confirm
-```
-
-Thay lat/lon/alt bằng vị trí test mong muốn. Đây là tọa độ giả cố định, chỉ dùng
-để kiểm tra đường truyền.
-
-Kết quả mong đợi:
-
-1. Terminal `wifi_gps.py` hiện `GPS OK ... injected=N`.
-2. Log `main.py` hiện listener GPS injection và yêu cầu phát GPS_RAW_INT.
-3. Mission Planner hiển thị GPS 3D Fix và số vệ tinh giả lập.
-4. Server chuyển từ `0 sats` sang số vệ tinh nhận từ Pixhawk.
-
-Nếu vẫn 0 sats:
-
-1. Xác nhận `main.py` được khởi động trước `wifi_gps.py`.
-2. Xác nhận đã reboot sau khi đặt `GPS1_TYPE=14` hoặc `GPS_TYPE=14`.
-3. Xác nhận `SERIALx_PROTOCOL=2` và baud khớp 921600.
-4. Kiểm tra terminal có dòng `GPS OK`; nếu chỉ có dòng listener thì chưa có fix.
-5. Xác nhận `network.forward_gps_raw_int: true` trong `config.yaml`.
-6. Xác nhận server UDP đang dùng `45.117.171.237:14550`.
-
-### 4.3 Test nguồn GPS thật gửi qua Wi-Fi
-
-Wi-Fi không tự tạo ra vị trí. Nguồn gửi phải có cảm biến định vị thật, ví dụ điện
-thoại có GPS hoặc module GNSS. Nguồn đó gửi JSON liên tục tới:
-
-```text
-udp://IP_CUA_PI:25100
-```
-
-JSON:
-
-```json
-{
-  "token": "thay-bang-token-rieng",
-  "lat": 21.0285,
-  "lon": 105.8542,
-  "alt_m": 10.0,
-  "accuracy_m": 3.0,
-  "speed_m_s": 0.0,
-  "course_deg": 0.0,
-  "fix_type": 3,
-  "satellites": 10
-}
-```
-
-Nguồn cần gửi liên tục khoảng 1–5 Hz. Nếu ngừng quá 2 giây, `wifi_gps.py` chủ
-động dừng GPS_INPUT và báo `GPS Wi-Fi stale`.
-
-Lưu ý quan trọng:
-
-- Điện thoại để cạnh người vận hành sẽ cho vị trí người vận hành, không phải drone.
-- Muốn theo dõi drone, nguồn GPS phải được gắn trên drone.
-- Định vị dựa trên IP/router/BSSID Wi-Fi chỉ gần đúng và không dùng để điều khiển bay.
-- Bay trong nhà nên dùng optical flow/VIO kết hợp rangefinder và EKF phù hợp.
-
-### 4.4 Kiểm tra marker telemetry
+### 4.2 Kiểm tra marker telemetry
 
 Trong lúc camera đang chạy và marker ID 5 đang xuất hiện:
 
@@ -345,7 +202,7 @@ Kết quả mong đợi:
 Giá trị thực tế sẽ thay đổi. Khi di chuyển marker sang phải, `offset_x` phải tăng.
 Khi marker đi lên phía trên ảnh, `offset_y` phải tăng.
 
-### 4.5 Đo FOV webcam
+### 4.3 Đo FOV webcam
 
 Không dùng FOV đoán cho precision landing.
 
@@ -372,7 +229,7 @@ landing:
 
 Khởi động lại `./run.sh` sau khi sửa.
 
-### 4.6 Cấu hình và test Precision Landing
+### 4.4 Cấu hình và test Precision Landing
 
 Trong Mission Planner:
 
@@ -406,7 +263,7 @@ camera không thay thế hoàn toàn EKF, optical flow/GPS/VIO hoặc rangefinde
 
 Các kiểm tra sau đã chạy thành công trong môi trường dự án:
 
-- Compile `main.py`, `forwarder.py`, `landing_mavlink.py`, `wifi_gps.py` và các
+- Compile `main.py`, `forwarder.py`, `landing_mavlink.py` và các
   module stream đã chỉnh sửa.
 - Parse `config.yaml` và sinh lại `Find_landing/camera_config_0.json`.
 - Xác nhận cấu hình CAM0 là 1280×720, 30 fps và detector 320×240.
@@ -414,7 +271,6 @@ Các kiểm tra sau đã chạy thành công trong môi trường dự án:
 - Kiểm tra phép đổi pixel sang góc radian theo FOV.
 - Pack/parse thành công message MAVLink `LANDING_TARGET`.
 - Xác nhận một message được gửi đồng thời tới kết nối Pixhawk và socket server.
-- Kiểm tra chế độ GPS fixed/dry-run sinh `GPS OK` đúng định dạng.
 - Kiểm tra `git diff --check` không có lỗi whitespace.
 
 Chưa thể xác nhận phần cứng trực tiếp trong môi trường kiểm thử vì không nhìn
@@ -427,7 +283,7 @@ Kiểm tra cú pháp:
 
 ```bash
 venv/bin/python -m py_compile \
-  main.py forwarder.py landing_mavlink.py wifi_gps.py \
+  main.py forwarder.py landing_mavlink.py \
   Find_landing/stream/metrics.py \
   Find_landing/stream/capture_loop.py \
   Find_landing/stream/h264_cv_loop.py
@@ -449,13 +305,11 @@ curl http://127.0.0.1:8080/api/connection
 Kiểm tra process:
 
 ```bash
-ps -ef | grep -E 'main.py|wifi_gps.py|camera_streamer.py|mediamtx'
+ps -ef | grep -E 'main.py|camera_streamer.py|mediamtx'
 ```
 
 ## 7. Tài liệu tham khảo
 
-- ArduPilot GPS Input:
-  <https://ardupilot.org/mavproxy/docs/modules/GPSInput.html>
 - ArduPilot MAVLink Precision Landing:
   <https://ardupilot.org/dev/docs/mavlink-precision-landing.html>
 - ArduPilot Precision Landing and Loiter:

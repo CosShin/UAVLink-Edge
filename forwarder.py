@@ -1,5 +1,4 @@
 import os
-import math
 import socket
 import threading
 import time
@@ -64,43 +63,6 @@ FULL_TELEMETRY_RATES_HZ = {
     "EXTENDED_SYS_STATE": 1.0,
 }
 COPTER_MODE_AUTO = 3
-
-
-def gps_input_to_raw_int(msg):
-    """Convert a validated GPS_INPUT fix to the GPS_RAW_INT used by the UI.
-
-    GPS_INPUT is still delivered to ArduPilot.  This companion-side copy lets a
-    bench server display the Wi-Fi fix without waiting for ArduPilot to echo the
-    external GPS stream back on the telemetry UART.
-    """
-    mav = mavutil.mavlink
-
-    def _u16(value: float, scale: float = 1.0) -> int:
-        return max(0, min(65534, int(round(float(value) * scale))))
-
-    ignore = int(getattr(msg, "ignore_flags", 0) or 0)
-    horizontal_velocity_known = not (ignore & mav.GPS_INPUT_IGNORE_FLAG_VEL_HORIZ)
-    if horizontal_velocity_known:
-        vn = float(getattr(msg, "vn", 0.0) or 0.0)
-        ve = float(getattr(msg, "ve", 0.0) or 0.0)
-        velocity = _u16((vn * vn + ve * ve) ** 0.5, 100.0)
-        course = _u16(math.degrees(math.atan2(ve, vn)) % 360.0, 100.0)
-    else:
-        velocity = 65535
-        course = 65535
-
-    return mav.MAVLink_gps_raw_int_message(
-        int(getattr(msg, "time_usec", 0) or time.time() * 1_000_000),
-        int(getattr(msg, "fix_type", 0) or 0),
-        int(getattr(msg, "lat", 0) or 0),
-        int(getattr(msg, "lon", 0) or 0),
-        int(round(float(getattr(msg, "alt", 0.0) or 0.0) * 1000.0)),
-        _u16(getattr(msg, "hdop", 0.0) or 0.0, 100.0),
-        _u16(getattr(msg, "vdop", 0.0) or 0.0, 100.0),
-        velocity,
-        course,
-        max(0, min(255, int(getattr(msg, "satellites_visible", 0) or 0))),
-    )
 
 
 def sys_status_to_battery_status(msg):
@@ -205,7 +167,6 @@ class Forwarder:
         self._rate_bytes_out = 0
 
         self._gps_last_at: Optional[datetime] = None
-        self._pixhawk_gps_last_at: Optional[datetime] = None
         self._battery_status_last_at: Optional[datetime] = None
         self._message_last_at: Dict[str, datetime] = {}
         self._gps_fix_type = 0
@@ -214,7 +175,6 @@ class Forwarder:
         self._hb_seq = 0
         self._companion_seq = 0
         self._mavlink_ka_seq = 0
-        self._local_inject_conn = None
         self._downlink_error_at = 0.0
         self._downlink_parser = mavutil.mavlink.MAVLink(None)
         self._mission_command_lock = threading.Lock()
@@ -345,14 +305,6 @@ class Forwarder:
             ).start()
 
         threading.Thread(target=self._downlink_loop, daemon=True, name="forwarder-downlink").start()
-        inject_port = int(self.network.get("local_inject_port", 14600) or 0)
-        if inject_port > 0:
-            threading.Thread(
-                target=self._local_gps_inject_loop,
-                args=(inject_port,),
-                daemon=True,
-                name="forwarder-local-gps-inject",
-            ).start()
         threading.Thread(target=self._heartbeat_loop, daemon=True, name="forwarder-heartbeat").start()
         threading.Thread(
             target=self._telemetry_stream_request_loop,
@@ -375,8 +327,6 @@ class Forwarder:
             logger.info("[MAVLINK] Full Pixhawk MAVLink uplink enabled")
         elif not forward_gps_raw_int(self.network):
             logger.info("[MAVLINK] GPS_RAW_INT uplink OFF — server uses EKF/global position only")
-        elif self.network.get("wifi_gps_relay_to_server", False):
-            logger.info("[GPS_RELAY] Wi-Fi GPS → server relay enabled for indoor bench testing")
         self._start_partner_heartbeat()
         threading.Thread(target=self._path_watchdog_loop, daemon=True, name="forwarder-path-watchdog").start()
         threading.Thread(target=self._ip_monitor_loop, daemon=True, name="forwarder-ip-monitor").start()
@@ -483,8 +433,6 @@ class Forwarder:
 
         if msg_type == "GPS_RAW_INT":
             self._gps_last_at = datetime.now(timezone.utc)
-            if path != "wifi_gps":
-                self._pixhawk_gps_last_at = self._gps_last_at
             self._gps_fix_type = int(getattr(msg, "fix_type", 0) or 0)
             self._gps_satellites = int(getattr(msg, "satellites_visible", 0) or 0)
         elif msg_type == "BATTERY_STATUS":
@@ -743,63 +691,6 @@ class Forwarder:
             logger.info("[MISSION] AUTO confirmed by heartbeat; forwarded queued CMD 300")
         except Exception as exc:
             logger.error("[MISSION] Failed to forward queued CMD 300: %s", exc)
-
-    def _local_gps_inject_loop(self, port: int) -> None:
-        """Accept only loopback GPS_INPUT packets and forward them to Pixhawk.
-
-        The active serial/UDP MAVLink connection must have a single owner.  This
-        listener lets wifi_gps.py coexist with main.py without opening the same
-        Pixhawk UART from a second process.
-        """
-        spec = f"udpin:127.0.0.1:{port}"
-        try:
-            conn = mavutil.mavlink_connection(spec)
-            self._local_inject_conn = conn
-            logger.info("[GPS_INJECT] Listening on %s (GPS_INPUT only)", spec)
-        except Exception as exc:
-            logger.error("[GPS_INJECT] Cannot listen on %s: %s", spec, exc)
-            return
-
-        last_wait_log = 0.0
-        while self.running:
-            try:
-                msg = conn.recv_match(blocking=True, timeout=1.0)
-                if msg is None:
-                    continue
-                if msg.get_type() != "GPS_INPUT":
-                    logger.warning("[GPS_INJECT] Dropped local %s packet", msg.get_type())
-                    continue
-                active = self._active_conn
-                if active is None:
-                    now = time.time()
-                    if now - last_wait_log >= 10.0:
-                        logger.warning("[GPS_INJECT] Waiting for Pixhawk connection")
-                        last_wait_log = now
-                    continue
-                with self._pixhawk_write_lock:
-                    active.write(msg.get_msgbuf())
-                if (
-                    self.network.get("wifi_gps_relay_to_server", False)
-                    and not self._pixhawk_armed
-                ):
-                    now = datetime.now(timezone.utc)
-                    pixhawk_gps_fresh = (
-                        self._pixhawk_gps_last_at is not None
-                        and (now - self._pixhawk_gps_last_at).total_seconds() <= 5.0
-                    )
-                    if not pixhawk_gps_fresh:
-                        raw_msg = gps_input_to_raw_int(msg)
-                        encoder = mavutil.mavlink.MAVLink(
-                            None,
-                            srcSystem=int(self._pixhawk_sys_id or 1),
-                            srcComponent=1,
-                        )
-                        raw_msg.pack(encoder)
-                        self._process_uplink_message(raw_msg, "wifi_gps")
-            except Exception as exc:
-                if self.running:
-                    logger.warning("[GPS_INJECT] Receive/forward error: %s", exc)
-                    time.sleep(0.5)
 
     def _start_partner_heartbeat(self) -> None:
         target = self._pixhawk_udp_target()
@@ -1069,8 +960,3 @@ class Forwarder:
                 pass
         if self.server_sock:
             self.server_sock.close()
-        if self._local_inject_conn:
-            try:
-                self._local_inject_conn.close()
-            except Exception:
-                pass

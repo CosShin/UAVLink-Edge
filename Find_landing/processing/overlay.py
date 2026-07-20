@@ -9,6 +9,7 @@ from processing.overlay_style import (
     FONT_SCALE_LABEL,
     GUIDE_LINE,
     LINE_THIN,
+    put_top_centered_text_line,
     put_text_line,
 )
 
@@ -52,19 +53,22 @@ def draw_overlay(frame, detection_result, overlay_enabled: bool = True, *, coord
     if not detection_result.get("detected", False):
         searching = detection_result.get("searching_id")
         visible = detection_result.get("aruco_visible_ids")
+        color = (0, 255, 255)
         if detection_result.get("ambiguous"):
             msg = f"AMBIGUOUS: {detection_result.get('reason', 'duplicate target')}"
-            put_text_line(frame, 0, msg, (0, 0, 255), FONT_SCALE_LABEL)
+            color = (0, 0, 255)
         elif searching is not None:
             msg = f"SEARCHING ArUco ID={searching}"
             if visible:
                 msg += f" (visible: {visible})"
-            put_text_line(frame, 0, msg, (0, 255, 255), FONT_SCALE_LABEL)
         else:
-            put_text_line(frame, 0, "SEARCHING...", (0, 255, 255), FONT_SCALE_LABEL)
+            msg = "SEARCHING..."
         state = detection_result.get("tracking_state")
+        put_top_centered_text_line(frame, 0, msg, color, FONT_SCALE_LABEL)
         if state:
-            put_text_line(frame, 1, f"Vision state: {state}", (0, 180, 255), FONT_SCALE_BODY)
+            put_top_centered_text_line(
+                frame, 1, f"Vision state: {state}", (0, 180, 255), FONT_SCALE_BODY,
+            )
         return frame
 
     fh, fw = frame.shape[:2]
@@ -122,5 +126,5 @@ class OverlayProcessor(FrameProcessor):
         if detection:
             state["overlay_frame"] = draw_overlay(out, detection, True)
         elif self.detection_enabled:
-            put_text_line(out, 0, "SEARCHING...", (0, 255, 255), FONT_SCALE_LABEL)
+            put_top_centered_text_line(out, 0, "SEARCHING...", (0, 255, 255), FONT_SCALE_LABEL)
             state["overlay_frame"] = out

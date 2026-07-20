@@ -83,7 +83,7 @@ def main() -> int:
             calibration_ok = calibration.is_file()
         else:
             level = "ERROR" if marker_length > 0 else "WARN"
-            add(level, "camera calibration", "not configured; angle-only mode")
+            add(level, "camera calibration", "not configured; metric pose unavailable")
 
         if args.probe_camera:
             import cv2
@@ -106,6 +106,14 @@ def main() -> int:
     mavlink_enabled = bool(landing.get("mavlink_enabled", False))
     hfov = float(landing.get("camera_hfov_deg", 0) or 0)
     vfov = float(landing.get("camera_vfov_deg", 0) or 0)
+    min_pose_distance = float(landing.get("min_pose_distance_m", 0.05) or 0.05)
+    max_pose_distance = float(landing.get("max_pose_distance_m", 30.0) or 30.0)
+    pose_bounds_ok = 0 < min_pose_distance < max_pose_distance
+    add(
+        "OK" if pose_bounds_ok else "ERROR",
+        "metric pose bounds",
+        f"{min_pose_distance:.2f}..{max_pose_distance:.2f}m; BODY_FRD position_valid=1",
+    )
     if mavlink_enabled:
         fov_ok = 1 <= hfov < 179 and 1 <= vfov < 179
         derived = bool(stream is not None and calibration_ok)

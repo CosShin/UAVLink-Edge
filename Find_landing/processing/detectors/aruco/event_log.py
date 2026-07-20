@@ -47,9 +47,11 @@ class LandingEventLogger:
                 "offset_x": detection.get("offset_x"),
                 "offset_y": detection.get("offset_y"),
                 "pose_camera_m": detection.get("pose_camera_m"),
+                "target_center_camera_m": detection.get("target_center_camera_m"),
+                "camera_to_target_distance_m": detection.get("camera_to_target_distance_m"),
+                "camera_to_target_depth_m": detection.get("camera_to_target_depth_m"),
             }
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
         except OSError:
             pass
-

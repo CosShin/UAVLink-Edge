@@ -217,7 +217,6 @@ UAVLink-Edge-Python/
 ├── cloud_egress.py
 ├── camera_mavlink.py
 ├── landing_mavlink.py
-├── wifi_gps.py                 # Wi-Fi JSON GPS → MAVLink GPS_INPUT
 ├── setup_camera.sh             # Boot overlay for CSI cameras
 ├── apply_camera_overlay.sh
 ├── install_camera_sudoers.sh   # One-time per Pi (auto user)
@@ -318,101 +317,10 @@ heartbeat chưa báo AUTO, edge yêu cầu AUTO trước, chờ heartbeat xác n
 log yêu cầu kiểm tra mission đã upload cùng item `NAV_TAKEOFF`; edge không tự tạo
 mission để tránh cất cánh ngoài kế hoạch.
 
-### GPS qua Wi-Fi để test trong nhà
-
-Wi-Fi chỉ vận chuyển tọa độ từ điện thoại/server; nó không tự đo vị trí. Trên
-Mission Planner, đặt `GPS1_TYPE = 14` (`MAVLink`) rồi reboot Pixhawk. Nếu firmware
-cũ hiển thị tên `GPS_TYPE` thì dùng tham số đó. Khi muốn dùng lại GPS vật lý, trả
-tham số về `Auto`/giá trị ban đầu.
-
-Chạy UAVLink trước để nó giữ duy nhất kết nối serial:
-
-```bash
-./run.sh
-```
-
-Ở terminal thứ hai, nhận JSON từ điện thoại/server trên UDP 25100. Nên đặt token:
-
-```bash
-WIFI_GPS_TOKEN='doi-token-nay' ./wifi_gps.py
-```
-
-Nếu terminal chỉ hiện `Nhận GPS JSON...` và `GPS_INPUT...` thì chương trình mới
-đang lắng nghe, chưa có GPS. Chỉ khi thấy dòng `GPS OK ... injected=N` mới có
-fix đang được bơm vào `main.py`/Pixhawk. Nguồn điện thoại phải gửi liên tục vì
-gói cũ quá 2 giây sẽ bị ngắt.
-
-Với `network.wifi_gps_relay_to_server: true`, forwarder đồng thời đổi fix này
-thành `GPS_RAW_INT` và gửi thẳng lên server qua kết nối Wi-Fi đã xác thực. Nhờ
-đó bản đồ/trạng thái GPS trên server không phải chờ Pixhawk echo lại GPS ngoài.
-Khi Pixhawk đã tự phát `GPS_RAW_INT`, relay tự nhường cho dữ liệu Pixhawk để
-tránh gửi trùng. Relay trực tiếp chỉ chạy khi Pixhawk **DISARMED**; khi ARM,
-server chỉ nhận GPS do Pixhawk phát. Chỉ bật tùy chọn này khi test trong nhà và
-tắt trước khi bay thật.
-
-Điện thoại/server gửi tới `<IP_CM5>:25100`:
-
-```json
-{
-  "token": "doi-token-nay",
-  "lat": 10.762622,
-  "lon": 106.660172,
-  "alt_m": 12.5,
-  "accuracy_m": 5.0,
-  "speed_m_s": 0.0,
-  "course_deg": 0.0,
-  "fix_type": 3,
-  "satellites": 10
-}
-```
-
-Nếu gói Wi-Fi cũ quá 2 giây, chương trình tự dừng phát `GPS_INPUT`. Chế độ tọa độ
-cố định chỉ dùng khi tháo cánh/quạt và DISARMED:
-
-```bash
-./wifi_gps.py --fixed 10.762622,106.660172,12.5 --bench-confirm
-```
-
-#### Bench GPS lai Wi-Fi + camera ArUco nhìn xuống
-
-Chế độ thử nghiệm này chốt fix Wi-Fi đầu tiên làm tọa độ gốc, rồi cộng dịch
-chuyển X/Y đo theo mét từ ArUco board. Nó chỉ phát `GPS_INPUT` khi cả gói Wi-Fi
-và pose camera đều mới/hợp lệ; mất board, tracking kém hoặc pose nhảy bất thường
-thì dừng phát.
-
-Pose mét yêu cầu camera `aruco_target_strategy: board`, calibration đúng camera
-và kích thước cạnh marker đen-vuông đã đo thật, ví dụ:
-
-```yaml
-aruco_target_strategy: board
-aruco_calibration_file: camera_calibration_1280x720.yaml
-aruco_marker_length_m: 0.20  # thay bằng số đo thật, không đoán
-```
-
-Sau khi `./run.sh` đã chạy camera detector, tháo cánh/quạt và chạy ở terminal
-thứ hai:
-
-```bash
-WIFI_GPS_TOKEN='doi-token-nay' ./wifi_gps.py \
-  --vision-camera-id 0 \
-  --vision-heading-deg 0 \
-  --bench-confirm
-```
-
-`--vision-heading-deg` là hướng la bàn của trục +X trên bản in (từ trái sang
-phải): `0` nếu cạnh đó hướng Bắc, `90` nếu hướng Đông. Nguồn Wi-Fi vẫn phải gửi
-JSON liên tục. Quan sát `vision_N`/`vision_E` khi di chuyển drone bằng tay; chưa
-dùng chế độ này để ARM hoặc bay trong nhà. Khi thêm `--dry-run`, chương trình chỉ
-kiểm tra dữ liệu và **không** gửi `GPS_INPUT` sang Pixhawk/server.
-
-Không mở `wifi_gps.py --direct /dev/ttyAMA0` cùng lúc với `main.py`. Mặc định file
-gửi vào loopback `127.0.0.1:14600`, và forwarder chỉ chấp nhận message
-`GPS_INPUT` trên cổng này.
-
 ### Pixhawk 2.4.8 / ArduPilot và điều khiển từ server
 
-Pixhawk 2.4.8 dùng firmware target `Pixhawk1`. GPS_INPUT và MAVLink hai chiều được
-hỗ trợ, nhưng board 1 MB dùng firmware cắt giảm tính năng. Dùng đúng bản stable
+Pixhawk 2.4.8 dùng firmware target `Pixhawk1`. MAVLink hai chiều được hỗ trợ,
+nhưng board 1 MB dùng firmware cắt giảm tính năng. Dùng đúng bản stable
 `Pixhawk1` do Mission Planner/firmware server cung cấp, không chọn `Pixhawk4`.
 
 Nếu CM5 nối vào TELEM2 (xác minh mapping trên board):
@@ -420,7 +328,6 @@ Nếu CM5 nối vào TELEM2 (xác minh mapping trên board):
 ```text
 SERIAL2_PROTOCOL = 2    # MAVLink2
 SERIAL2_BAUD     = 921  # khớp config serial_baud: 921600
-GPS1_TYPE        = 14   # chỉ khi dùng wifi_gps.py
 ```
 
 TX/RX phải đấu chéo và chung GND; không cấp nguồn Pixhawk từ chân 5V của UART.

@@ -99,7 +99,14 @@ def _calibrated_fov(cfg, camera_id: int) -> tuple[float, float] | None:
     return _fov_from_camera_matrix(data["camera_matrix"], data["image_size"])
 
 
-def _landing_target_from_telemetry(lt: dict, hfov_deg: float, vfov_deg: float):
+def _landing_target_from_telemetry(
+    lt: dict,
+    hfov_deg: float,
+    vfov_deg: float,
+    *,
+    min_distance_m: float = 0.05,
+    max_distance_m: float = 30.0,
+):
     frame_width = int(lt.get("frame_width") or 0)
     frame_height = int(lt.get("frame_height") or 0)
     offset_x = float(lt.get("offset_x") or 0.0)
@@ -118,6 +125,11 @@ def _landing_target_from_telemetry(lt: dict, hfov_deg: float, vfov_deg: float):
         size_x = size_y = 0.0
 
     mav = mavlink_common.MAVLink(None)
+    x_body, y_body, z_body, distance = _body_frd_position_from_telemetry(
+        lt,
+        min_distance_m=min_distance_m,
+        max_distance_m=max_distance_m,
+    )
     try:
         return mav.landing_target_encode(
             time.monotonic_ns() // 1000,
@@ -125,27 +137,60 @@ def _landing_target_from_telemetry(lt: dict, hfov_deg: float, vfov_deg: float):
             mavlink_common.MAV_FRAME_BODY_FRD,
             angle_x,
             angle_y,
-            0.0,  # Unknown without a rangefinder.
+            distance,
             size_x,
             size_y,
-            0.0,
-            0.0,
-            0.0,
+            x_body,
+            y_body,
+            z_body,
+            q=(1.0, 0.0, 0.0, 0.0),
             type=mavlink_common.LANDING_TARGET_TYPE_VISION_FIDUCIAL,
-            position_valid=0,
+            position_valid=1,
         )
     except TypeError:
-        # Compatibility with older pymavlink dialects lacking MAVLink2 fields.
-        return mav.landing_target_encode(
-            time.monotonic_ns() // 1000,
-            0,
-            mavlink_common.MAV_FRAME_BODY_FRD,
-            angle_x,
-            angle_y,
-            0.0,
-            size_x,
-            size_y,
+        raise ValueError(
+            "installed pymavlink does not support metric LANDING_TARGET fields"
         )
+
+
+def _body_frd_position_from_telemetry(
+    lt: dict,
+    *,
+    min_distance_m: float = 0.05,
+    max_distance_m: float = 30.0,
+) -> tuple[float, float, float, float]:
+    """Convert calibrated OpenCV target pose to MAV_FRAME_BODY_FRD.
+
+    OpenCV camera coordinates are X right, Y down and Z along the optical axis.
+    The downward camera is mounted with image-top facing vehicle-forward, so
+    BODY_FRD is X=-camera_Y, Y=camera_X, Z=camera_Z.
+    """
+    if not lt.get("pose_valid"):
+        raise ValueError("metric target pose is not valid")
+    pose = lt.get("target_center_camera_m") or lt.get("pose_camera_m")
+    if not isinstance(pose, (list, tuple)) or len(pose) != 3:
+        raise ValueError("metric target pose must contain camera X/Y/Z")
+    try:
+        camera_x, camera_y, camera_z = (float(value) for value in pose)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("metric target pose is not numeric") from exc
+    if not all(math.isfinite(value) for value in (camera_x, camera_y, camera_z)):
+        raise ValueError("metric target pose must be finite")
+    if camera_z <= 0:
+        raise ValueError("metric target must be in front of the camera")
+
+    x_body = -camera_y
+    y_body = camera_x
+    z_body = camera_z
+    distance = math.sqrt(x_body * x_body + y_body * y_body + z_body * z_body)
+    minimum = max(0.001, float(min_distance_m))
+    maximum = max(minimum, float(max_distance_m))
+    if not minimum <= distance <= maximum:
+        raise ValueError(
+            f"metric target distance {distance:.3f}m outside "
+            f"{minimum:.3f}..{maximum:.3f}m"
+        )
+    return x_body, y_body, z_body, distance
 
 
 def _telemetry_control_ready(
@@ -154,6 +199,9 @@ def _telemetry_control_ready(
     min_quality: float,
     max_measurement_age_ms: int,
     require_control_valid: bool,
+    require_metric_pose: bool = False,
+    min_distance_m: float = 0.05,
+    max_distance_m: float = 30.0,
     now_monotonic_ms: int | None = None,
 ) -> bool:
     """Fail closed when the vision measurement is stale, held or ambiguous."""
@@ -168,7 +216,7 @@ def _telemetry_control_ready(
     age_ms = now_ms - measurement_ms if measurement_ms > 0 else 10**9
     quality = float(lt.get("quality", 0.0) or 0.0)
     control_ok = bool(lt.get("control_valid")) or not require_control_valid
-    return bool(
+    base_ready = bool(
         lt.get("detected")
         and not lt.get("hold")
         and not lt.get("ambiguous")
@@ -176,6 +224,18 @@ def _telemetry_control_ready(
         and quality >= min_quality
         and 0 <= age_ms <= max_measurement_age_ms
     )
+    if not base_ready:
+        return False
+    if require_metric_pose:
+        try:
+            _body_frd_position_from_telemetry(
+                lt,
+                min_distance_m=min_distance_m,
+                max_distance_m=max_distance_m,
+            )
+        except ValueError:
+            return False
+    return True
 
 
 def start_landing_mavlink_bridge(cfg, forwarder, stop_event: Optional[threading.Event] = None) -> None:
@@ -202,6 +262,11 @@ def start_landing_mavlink_bridge(cfg, forwarder, stop_event: Optional[threading.
     min_quality = max(0.0, min(1.0, float(landing.get("min_quality", 0.55) or 0.55)))
     max_measurement_age_ms = max(50, int(landing.get("max_measurement_age_ms", 300) or 300))
     require_control_valid = bool(landing.get("require_control_valid", True))
+    min_distance_m = max(0.001, float(landing.get("min_pose_distance_m", 0.05) or 0.05))
+    max_distance_m = max(
+        min_distance_m,
+        float(landing.get("max_pose_distance_m", 30.0) or 30.0),
+    )
     if not (1.0 <= hfov_deg < 179.0 and 1.0 <= vfov_deg < 179.0):
         logger.error(
             "[LANDING][MAVLINK] disabled: set calibrated camera_hfov_deg and "
@@ -210,13 +275,15 @@ def start_landing_mavlink_bridge(cfg, forwarder, stop_event: Optional[threading.
         return
     logger.info(
         "[LANDING][MAVLINK] LANDING_TARGET cam%d @ %.1f Hz, FOV %.1fx%.1f deg, "
-        "quality>=%.2f age<=%dms (%s)",
+        "quality>=%.2f age<=%dms metric=%.2f..%.1fm (%s)",
         camera_id,
         hz,
         hfov_deg,
         vfov_deg,
         min_quality,
         max_measurement_age_ms,
+        min_distance_m,
+        max_distance_m,
         fov_source,
     )
 
@@ -229,9 +296,24 @@ def start_landing_mavlink_bridge(cfg, forwarder, stop_event: Optional[threading.
                 min_quality=min_quality,
                 max_measurement_age_ms=max_measurement_age_ms,
                 require_control_valid=require_control_valid,
+                require_metric_pose=True,
+                min_distance_m=min_distance_m,
+                max_distance_m=max_distance_m,
             ):
                 try:
-                    msg = _landing_target_from_telemetry(lt, hfov_deg, vfov_deg)
+                    # Revalidate the same metric bounds immediately before encode.
+                    _body_frd_position_from_telemetry(
+                        lt,
+                        min_distance_m=min_distance_m,
+                        max_distance_m=max_distance_m,
+                    )
+                    msg = _landing_target_from_telemetry(
+                        lt,
+                        hfov_deg,
+                        vfov_deg,
+                        min_distance_m=min_distance_m,
+                        max_distance_m=max_distance_m,
+                    )
                     _publish_generated(forwarder, msg)
                 except (TypeError, ValueError) as exc:
                     now = time.monotonic()

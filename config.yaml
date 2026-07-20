@@ -15,7 +15,6 @@ network:
   tcp_host: 0.0.0.0
   tcp_port: 14540
   local_listen_port: 14540
-  local_inject_port: 14600
   target_host: 45.117.171.237
   target_port: 14550
   protocol: udp
@@ -24,8 +23,6 @@ network:
   forward_gps_raw_int: true
   # Forward all packets and request a full ~70 msg/s telemetry profile.
   forward_all_mavlink: true
-  # DISARMED indoor bench: relay Wi-Fi GPS without waiting for Pixhawk echo.
-  wifi_gps_relay_to_server: true
   fallback_delay: 300
 ethernet:
   interface: eth0
@@ -88,9 +85,9 @@ camera:
     overlay_frame_skip: 2
     detection_lost_hold_ms: 1500
     detection_reacquire_ms: 2500
-    aruco_marker_id: 5
+    aruco_marker_id: 6
     # single: one unique marker ID; board: fuse IDs 0..11 using known layout.
-    aruco_target_strategy: board
+    aruco_target_strategy: single
     aruco_board_first_id: 0
     aruco_board_cols: 3
     aruco_board_rows: 4
@@ -102,11 +99,13 @@ camera:
     # Close: one fully visible large board marker is enough; far: retry at 960px.
     aruco_board_close_single_marker_area_ratio: 0.08
     aruco_reacquire_detect_width: 960
-    # Required only for metric PnP pose; keep 0 until the printed marker is measured.
-    aruco_marker_length_m: 0.0
-    aruco_calibration_file: ''
+    # Measured outer black-marker side: 105 mm.
+    aruco_marker_length_m: 0.105
+    aruco_calibration_file: camera_calibration_1280x720.yaml
     aruco_min_quality: 0.55
     aruco_acquire_frames: 5
+    # Higher alpha follows marker motion faster; 0.55 balances latency and jitter.
+    aruco_ema_alpha: 0.55
     sharpness: 1.5
     saturation: 1.0
     lores_size:
@@ -156,15 +155,19 @@ landing:
   mode: normal
   safety_level: 2
   template: H
-  mavlink_enabled: true
+  mavlink_enabled: false
   mavlink_hz: 10
   mavlink_camera_id: 0
-  # Calibrate these two values for the actual USB webcam before enabling MAVLink landing.
-  camera_hfov_deg:  60.0 
-  camera_vfov_deg:  45.0 
+  # Zero makes the bridge derive FOV from the camera calibration file.
+  camera_hfov_deg: 0
+  camera_vfov_deg: 0
   min_quality: 0.55
   max_measurement_age_ms: 300
   require_control_valid: true
+  # Metric pose from calibrated ArUco is sent as BODY_FRD x/y/z.
+  # Camera assumption: downward, with the top of its image facing drone-forward.
+  min_pose_distance_m: 0.05
+  max_pose_distance_m: 30.0
 lcd:
   enabled: false
   auto_setup: false

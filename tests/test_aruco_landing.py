@@ -13,7 +13,12 @@ FIND_LANDING = ROOT / "Find_landing"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(FIND_LANDING))
 
-from landing_mavlink import _fov_from_camera_matrix, _telemetry_control_ready  # noqa: E402
+from landing_mavlink import (  # noqa: E402
+    _body_frd_position_from_telemetry,
+    _fov_from_camera_matrix,
+    _landing_target_from_telemetry,
+    _telemetry_control_ready,
+)
 from processing.detectors.aruco.board import duplicate_ids  # noqa: E402
 from processing.detectors.aruco.calibration import matrix_for_size  # noqa: E402
 from processing.detectors.aruco.compat import create_aruco_detector  # noqa: E402
@@ -82,6 +87,37 @@ class DetectorTests(unittest.TestCase):
         self.assertAlmostEqual(result["h_position"][0], 640, delta=8)
         self.assertAlmostEqual(result["h_position"][1], 360, delta=20)
 
+    def test_board_metric_distance_uses_landing_center(self):
+        board = cv2.imread(str(TEMPLATES / "aruco_board_dict_4x4_50_0-11.png"))
+        height, width = board.shape[:2]
+        calibration = {
+            "camera_matrix": np.asarray(
+                [
+                    [800.0, 0.0, width / 2.0],
+                    [0.0, 800.0, height / 2.0],
+                    [0.0, 0.0, 1.0],
+                ],
+                dtype=np.float64,
+            ),
+            "dist_coeffs": np.zeros((5, 1), dtype=np.float64),
+            "image_size": (width, height),
+        }
+        result = detect_frame(
+            board,
+            (width, height),
+            self.detector,
+            marker_id=5,
+            detect_size=(width, height),
+            target_strategy="board",
+            board_min_markers=2,
+            calibration=calibration,
+            marker_length_m=0.10,
+        )
+        self.assertTrue(result["pose_valid"])
+        self.assertEqual(len(result["target_center_camera_m"]), 3)
+        self.assertGreater(result["camera_to_target_distance_m"], 0.0)
+        self.assertGreater(result["camera_to_target_depth_m"], 0.0)
+
     def test_board_rejects_one_marker(self):
         result = self.detect(
             marker_with_quiet_border(5),
@@ -122,6 +158,35 @@ class DetectorTests(unittest.TestCase):
 
     def test_duplicate_id_helper(self):
         self.assertEqual(duplicate_ids([{"id": 2}, {"id": 3}, {"id": 2}]), [2])
+
+    def test_single_marker_metric_camera_distance(self):
+        raw = cv2.imread(str(TEMPLATES / "aruco_dict_4x4_50_id5.png"))
+        marker = cv2.resize(raw, (200, 200), interpolation=cv2.INTER_NEAREST)
+        canvas = np.full((720, 1280, 3), 255, dtype=np.uint8)
+        canvas[260:460, 540:740] = marker
+        calibration = {
+            "camera_matrix": np.asarray(
+                [[800.0, 0.0, 640.0], [0.0, 800.0, 360.0], [0.0, 0.0, 1.0]],
+                dtype=np.float64,
+            ),
+            "dist_coeffs": np.zeros((5, 1), dtype=np.float64),
+            "image_size": (1280, 720),
+        }
+        result = detect_frame(
+            canvas,
+            (1280, 720),
+            self.detector,
+            marker_id=5,
+            detect_size=(1280, 720),
+            target_strategy="single",
+            calibration=calibration,
+            marker_length_m=0.20,
+        )
+        self.assertTrue(result["detected"])
+        self.assertTrue(result["pose_valid"])
+        self.assertAlmostEqual(result["camera_to_target_depth_m"], 0.80, delta=0.03)
+        self.assertAlmostEqual(result["camera_to_target_distance_m"], 0.80, delta=0.03)
+        self.assertLess(result["pnp_reprojection_error_px"], 1.0)
 
 
 class TrackingStateTests(unittest.TestCase):
@@ -174,6 +239,69 @@ class TrackingStateTests(unittest.TestCase):
 
 
 class CalibrationAndMavlinkGateTests(unittest.TestCase):
+    def test_opencv_pose_is_converted_to_body_frd(self):
+        x, y, z, distance = _body_frd_position_from_telemetry(
+            {
+                "pose_valid": True,
+                "target_center_camera_m": [0.20, -0.30, 1.50],
+            }
+        )
+        self.assertAlmostEqual(x, 0.30)
+        self.assertAlmostEqual(y, 0.20)
+        self.assertAlmostEqual(z, 1.50)
+        self.assertAlmostEqual(distance, np.linalg.norm([0.20, -0.30, 1.50]))
+
+    def test_metric_landing_target_populates_position_and_distance(self):
+        msg = _landing_target_from_telemetry(
+            {
+                "frame_width": 1280,
+                "frame_height": 720,
+                "offset_x": 100,
+                "offset_y": 50,
+                "h_size": [120, 120],
+                "pose_valid": True,
+                "target_center_camera_m": [0.20, -0.30, 1.50],
+            },
+            65.0,
+            40.0,
+        )
+        self.assertEqual(msg.frame, 12)  # MAV_FRAME_BODY_FRD
+        self.assertEqual(msg.position_valid, 1)
+        self.assertAlmostEqual(msg.x, 0.30)
+        self.assertAlmostEqual(msg.y, 0.20)
+        self.assertAlmostEqual(msg.z, 1.50)
+        self.assertAlmostEqual(msg.distance, np.linalg.norm([0.20, -0.30, 1.50]))
+
+    def test_metric_pose_gate_fails_closed(self):
+        base = {
+            "detected": True,
+            "hold": False,
+            "ambiguous": False,
+            "control_valid": True,
+            "quality": 0.9,
+            "measurement_monotonic_ms": 1000,
+            "pose_valid": True,
+            "target_center_camera_m": [0.0, 0.0, 1.0],
+        }
+        kwargs = {
+            "min_quality": 0.55,
+            "max_measurement_age_ms": 300,
+            "require_control_valid": True,
+            "require_metric_pose": True,
+            "now_monotonic_ms": 1200,
+        }
+        self.assertTrue(_telemetry_control_ready(base, **kwargs))
+        for unsafe in (
+            {"pose_valid": False},
+            {"target_center_camera_m": None},
+            {"target_center_camera_m": [0.0, 0.0, -1.0]},
+            {"target_center_camera_m": [0.0, 0.0, float("nan")]},
+            {"target_center_camera_m": [0.0, 0.0, 31.0]},
+        ):
+            candidate = dict(base)
+            candidate.update(unsafe)
+            self.assertFalse(_telemetry_control_ready(candidate, **kwargs), unsafe)
+
     def test_camera_matrix_scales_to_output_resolution(self):
         calibration = {
             "camera_matrix": np.asarray(

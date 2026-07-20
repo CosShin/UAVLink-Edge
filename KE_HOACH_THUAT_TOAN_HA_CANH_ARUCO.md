@@ -11,8 +11,9 @@ thẳng đứng trong tài liệu này; cần thiết kế lại đường glide
 theo airspeed.
 
 > Đây là tài liệu thiết kế, không phải xác nhận hệ thống đã an toàn để bay tự
-> động. Cấu hình hiện tại vẫn để `landing.mavlink_enabled: false`, FOV bằng 0 và
-> chưa có hiệu chuẩn camera/rangefinder hoàn chỉnh.
+> động. Cấu hình hiện tại vẫn để `landing.mavlink_enabled: false`; camera đã trỏ
+> tới file calibration để ước lượng pose, nhưng vẫn cần kiểm thử thực tế trước
+> khi bật phát `LANDING_TARGET`.
 
 ## 1. Kết luận ngắn gọn trước
 
@@ -24,10 +25,11 @@ Hệ thống hiện tại gồm hai bên:
    - Chụp webcam USB 1280×720.
    - Resize ảnh nhận diện xuống 320×240.
    - Dùng OpenCV ArUco `DICT_4X4_50`.
-   - Chỉ chọn marker ID 5 làm mục tiêu.
+   - Chỉ chọn marker ID 6 làm mục tiêu theo `config.yaml`.
    - Làm mượt tâm marker bằng EMA.
-   - Đổi độ lệch pixel sang góc radian theo FOV camera.
-   - Gửi MAVLink `LANDING_TARGET` 10 Hz cho Pixhawk và mirror lên server.
+   - Tính pose/khoảng cách từ calibration camera.
+   - Đổi pose OpenCV sang BODY_FRD `x/y/z`.
+   - Gửi MAVLink `LANDING_TARGET` 10 Hz với `position_valid=1` khi bridge được bật.
 
 2. **Pixhawk/ArduCopter**:
    - Nhận `LANDING_TARGET`.
@@ -42,7 +44,8 @@ mới điều khiển motor.
 
 ### 1.2 “Tìm bãi đáp” hiện tại có nghĩa gì?
 
-Code hiện tại chỉ tìm **bãi đáp đã được đánh dấu bằng đúng ArUco ID 5**. Nó chưa:
+Code hiện tại chỉ tìm **bãi đáp đã được đánh dấu bằng đúng ArUco ID 6** theo
+`config.yaml`. Nó chưa:
 
 - Phân loại mặt đất có bằng phẳng hay không.
 - Phát hiện người, cây, dây điện, xe hoặc vật cản trên bãi.
@@ -112,7 +115,7 @@ Trình tự trong `Find_landing/processing/detectors/aruco/detect.py`:
 2. Đổi BGR → grayscale.
 3. Gọi `ArucoDetector.detectMarkers()`.
 4. Chỉ giữ ID trong khoảng 0–11.
-5. Tìm đúng `aruco_marker_id`, hiện là ID 5.
+5. Tìm đúng `aruco_marker_id`, hiện là ID 6.
 6. Lấy trung bình bốn corner làm tâm.
 7. Scale tâm/corner từ 320×240 về hệ tọa độ 1280×720.
 8. Tính:
@@ -164,8 +167,9 @@ Message hiện dùng:
 ```text
 frame          = MAV_FRAME_BODY_FRD
 angle_x/y      = góc radian
-distance       = 0, vì chưa có rangefinder đưa vào message
-position_valid = 0, vì chỉ có góc chứ chưa có XYZ metric
+distance       = chuẩn Euclid của target XYZ metric
+x/y/z          = target trong body frame: forward/right/down
+position_valid = 1
 ```
 
 ArduPilot yêu cầu `LANDING_TARGET` ít nhất 1 Hz; dự án phát 10 Hz khi target mới,
@@ -193,18 +197,17 @@ Phải phân biệt ba trường hợp hoàn toàn khác nhau.
 
 ### 3.1 Nhiều ID khác nhau thuộc cùng một bảng
 
-Ví dụ camera thấy ID `[2, 5, 7, 8]` trên tấm board 0–11.
+Ví dụ camera thấy ID `[2, 6, 7, 8]` trên tấm board 0–11.
 
 Hành vi hiện tại:
 
 - Overlay vẽ tất cả marker nhìn thấy.
-- Chỉ ID 5 được dùng làm tâm điều khiển.
-- Các ID 2, 7, 8 không được hợp nhất để tính pose.
-- `mode` có thể ghi là `board`, nhưng code chưa thực hiện board pose estimation.
+- Khi chạy `single`, chỉ ID 6 được dùng làm tâm điều khiển.
+- Khi chạy `board`, các ID hợp lệ được hợp nhất để ước lượng tâm/pose board.
 
-Hệ quả: việc in board 0–11 hiện giúp quan sát nhiều marker, nhưng không làm ước
-lượng đáp chính xác hơn. Nếu ID 5 bị che dù các ID khác vẫn rõ, Pi ngừng gửi
-`LANDING_TARGET`.
+Hệ quả: với cấu hình hiện tại `single`, nếu ID 6 bị che dù các ID khác vẫn rõ,
+Pi ngừng gửi `LANDING_TARGET`. Muốn tận dụng nhiều ID thì phải chuyển
+`aruco_target_strategy: board` và test lại layout/thước đo.
 
 Giải pháp đề xuất:
 
@@ -274,11 +277,11 @@ phải có transform vật lý về cùng origin. Không được đổi tâm đ
 
 | Tình huống | Nguy cơ | Hành vi hiện tại | Hành vi cần có |
 |---|---|---|---|
-| Đúng ID 5, rõ, gần tâm | Bình thường | Gửi góc 10 Hz | Track, align và cho ArduCopter descend |
+| Đúng ID 6, rõ, gần tâm | Bình thường | Gửi `x/y/z` 10 Hz | Track, align và cho ArduCopter descend |
 | Không thấy marker | Mất tham chiếu | Không gửi target | ArduCopter xử lý theo `PLND_STRICT/ALT_*`; Pi báo LOST |
 | Chỉ thấy ID khác | Đáp nhầm nếu chọn sai | Không gửi ID khác | Giữ SEARCH cho ID nhiệm vụ |
-| Nhiều ID trên cùng board | Bỏ phí thông tin | Chỉ dùng ID 5 | Fuse board pose từ mọi ID hợp lệ |
-| Hai ID 5 khác vị trí | Nhảy mục tiêu | Chọn instance đầu tiên | AMBIGUOUS → ngừng target/HOLD/ABORT |
+| Nhiều ID trên cùng board | Bỏ phí thông tin nếu đang ở `single` | Chỉ dùng ID 6 | Fuse board pose từ mọi ID hợp lệ |
+| Hai ID 6 khác vị trí | Nhảy mục tiêu | AMBIGUOUS, không gửi | AMBIGUOUS → ngừng target/HOLD/ABORT |
 | Marker bị che một phần | Corner sai/mất ID | Có thể mất target | Board fusion + reprojection gate |
 | Marker sát mép ảnh | Pose sai, sắp mất | Vẫn có thể gửi | Giảm tốc ngang, không descend nếu quality thấp |
 | Marker quá nhỏ | Decode sai/không thấy | SEARCH | Marker lớn hơn hoặc approach theo GPS/optical flow |
@@ -401,11 +404,12 @@ translation theo mét và orientation của pad, hữu ích hơn chỉ góc pixe
 
 ### 5.4 Khi nào dùng angle, khi nào dùng XYZ?
 
-- **Giai đoạn hiện tại**: gửi `angle_x/angle_y`, `position_valid=0`.
-- **Sau khi PnP + extrinsic được xác minh**: có thể gửi `x/y/z` trong body frame,
-  `position_valid=1` nếu ArduPilot version đang dùng hỗ trợ đúng workflow này.
-- Không chuyển sang XYZ chỉ vì `solvePnP` trả kết quả; phải kiểm tra scale,
-  ambiguity planar, trục và covariance bằng ground truth trước.
+- **Giai đoạn hiện tại**: gửi `x/y/z`, `distance` trong body frame và
+  `position_valid=1`.
+- Bridge đổi pose OpenCV `(right, down, optical-forward)` thành BODY_FRD
+  `(-camera_y, camera_x, camera_z)` và fail-closed nếu pose không hợp lệ.
+- Pose PnP vẫn phải được kiểm tra scale, ambiguity planar, trục và covariance
+  bằng ground truth trước khi bay thật.
 
 ## 6. State machine đề xuất
 
@@ -952,4 +956,3 @@ video overlay là bằng chứng duy nhất để arm hoặc LAND.
 8. Test native Precision Landing trong SITL trước, sau đó mới test bridge.
 9. Không trộn bài toán marker landing với bài toán tìm bãi tự nhiên/an toàn.
 10. Chỉ mở flight envelope theo từng gate có log và metric định lượng.
-
